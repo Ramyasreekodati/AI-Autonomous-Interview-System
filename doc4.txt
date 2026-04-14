@@ -1,0 +1,74 @@
+Pre-Requisites
+1. Technical Knowledge Requirements
+To develop and understand the system, the following foundational knowledge is required:
+• Programming Languages:
+– Python (primary language for AI and backend development)
+– JavaScript (for frontend development)
+• Artificial Intelligence & Machine Learning:
+– Basics of supervised learning
+– Understanding of deep learning concepts (CNN, NLP)
+– Model training and inference
+• Computer Vision:
+– Image processing fundamentals
+– Face detection and object detection techniques
+• Natural Language Processing (NLP):
+– Text processing
+– Conversational AI basics
+• Web Development:
+– REST API concepts
+– Frontend-backend communication
+2. Software Requirements
+The following software tools and platforms are required for development:
+Software Purpose
+Backend and AI
+Python (3.8 or above)
+development
+Node.js Frontend and API handling
+Visual Studio Code /
+Code development
+PyCharm
+Git & GitHub Version control
+Postman API testing
+Docker (optional) Containerization
+3. Libraries & Frameworks
+The system uses the following major libraries and frameworks:
+Category Tools
+Backend Framework FastAPI / Flask
+TensorFlow, PyTorch, Scikit-
+AI/ML Libraries
+learn
+Computer Vision OpenCV
+NLP Transformers (Hugging Face)
+Frontend React.js
+Database PostgreSQL / MongoDB
+Real-Time
+WebSockets / WebRTC
+Communication
+4. Hardware Requirements
+Minimum hardware specifications for development and testing:
+Component Requirement
+Processor Intel i5 / Ryzen 5 or higher
+Minimum 8 GB (16 GB
+RAM
+recommended)
+Storage 10 GB free space
+Camera Webcam (for real-time monitoring)
+Recommended for faster AI
+GPU (Optional)
+processing
+5. System Requirements
+Requirement Details
+Operating System Windows / Linux / macOS
+Internet Required for APIs and model
+Connection usage
+Browser Chrome / Edge (latest version)
+6. Development Tools & Setup
+• Code editor with extensions (Python, JS support)
+• Virtual environment setup (venv/conda)
+• Database setup (local or cloud)
+• API testing tools (Postman)
+• Version control system (Git)
+7. Additional Requirements
+• Basic understanding of system architecture and APIs
+• Knowledge of JSON data handling
+• Familiarity with debugging and testing techniques
