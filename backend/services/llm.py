@@ -7,14 +7,9 @@ class LLMService:
 
     @property
     def generator(self):
-        if self._generator is None:
-            try:
-                print("Loading LLM model (distilgpt2)...")
-                self._generator = pipeline("text-generation", model="distilgpt2")
-            except Exception as e:
-                print(f"Error loading LLM: {e}")
-                self._generator = "FAILED"
-        return self._generator if self._generator != "FAILED" else None
+        # Disabled for Streamlit Cloud to save RAM (1GB limit)
+        # return self._generator if self._generator != "FAILED" else None
+        return None
 
     def generate_question(self, category="Technical", difficulty="Medium"):
         gen = self.generator
