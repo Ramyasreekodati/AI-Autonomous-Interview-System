@@ -6,7 +6,7 @@ import time
 import base64
 
 # Add backend to path to import services
-sys.path.append(os.path.abspath('backend'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
 
 from database import SessionLocal, engine, get_db
 import models
