@@ -3,8 +3,10 @@ fastapi
 uvicorn
 SQLAlchemy
 reportlab
-python-jose[cryptography]
-passlib[bcrypt]
+python-jose
+passlib
+cryptography
+bcrypt
 numpy
 opencv-python-headless
 mediapipe
