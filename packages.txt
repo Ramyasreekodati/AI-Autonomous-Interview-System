@@ -1,1 +1,2 @@
-# Empty for now
+libgl1
+libglib2.0-0
