@@ -8,16 +8,24 @@ import base64
 # Add backend to path to import services
 sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
 
-from database import SessionLocal, engine, get_db
-import models
-from services.auth import auth_service
-from services.surveillance import surveillance
-from services.scoring import scoring_service
-from services.llm import llm_service
-from services.reporting import reporting_service
+# --- ERROR CATCHING WRAPPER ---
+try:
+    from database import SessionLocal, engine, get_db
+    import models
+    from services.auth import auth_service
+    from services.surveillance import surveillance
+    from services.scoring import scoring_service
+    from services.llm import llm_service
+    from services.reporting import reporting_service
 
-# Initialize database
-models.Base.metadata.create_all(bind=engine)
+    # Initialize database
+    models.Base.metadata.create_all(bind=engine)
+except Exception as e:
+    st.error(f"Critical Startup Error: {e}")
+    st.info("Debugging Information:")
+    import traceback
+    st.code(traceback.format_exc())
+    st.stop()
 
 # --- APP CONFIG ---
 st.set_page_config(
