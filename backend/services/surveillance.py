@@ -1,4 +1,4 @@
-import cv2
+# Global imports removed for lazy loading
 import numpy as np
 from sqlalchemy.orm import Session
 import models
@@ -22,6 +22,7 @@ class SurveillanceService:
         return self._face_detection if self._face_detection != "FAILED" else None
 
     def process_frame(self, frame_bytes, interview_id: int, db: Session):
+        import cv2
         # Convert bytes to numpy array
         nparr = np.frombuffer(frame_bytes, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)

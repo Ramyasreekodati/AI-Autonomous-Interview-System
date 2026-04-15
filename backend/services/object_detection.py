@@ -1,18 +1,23 @@
-import cv2
+# Global cv2 removed for lazy loading
 import numpy as np
 import os
 
 class ObjectDetectionService:
     def __init__(self):
-        # Using a simple MobileNet SSD for phone detection
-        # We'll use the pre-trained weights from OpenCV's model zoo
-        self.net = cv2.dnn.readNetFromCaffe(
-            cv2.samples.findFile('deploy.prototxt'), 
-            cv2.samples.findFile('mobilenet_iter_73000.caffemodel')
-        )
-        self.classes = {15: "person", 77: "cell phone"} # COCO class IDs (approx for SSD)
+        self.net = None
+        self.classes = {15: "person", 77: "cell phone"}
+        
+    def _init_net(self):
+        if self.net is None:
+            import cv2
+            self.net = cv2.dnn.readNetFromCaffe(
+                cv2.samples.findFile('deploy.prototxt'), 
+                cv2.samples.findFile('mobilenet_iter_73000.caffemodel')
+            )
 
     def detect_phone(self, frame):
+        import cv2
+        self._init_net()
         (h, w) = frame.shape[:2]
         blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
         self.net.setInput(blob)

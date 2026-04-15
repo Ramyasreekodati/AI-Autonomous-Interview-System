@@ -6,25 +6,31 @@ import time
 import base64
 
 # Add backend to path to import services
-sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
+backend_path = os.path.abspath("backend")
+if backend_path not in sys.path:
+    sys.path.append(backend_path)
 
-# --- ERROR CATCHING WRAPPER ---
-try:
-    from database import SessionLocal, engine, get_db
-    import models
-    from services.auth import auth_service
-    from services.surveillance import surveillance
-    from services.scoring import scoring_service
-    from services.llm import llm_service
-    from services.reporting import reporting_service
+# Move imports after path setup and wrap them
+import models
+from database import SessionLocal, engine
+from services.auth import auth_service
+from services.surveillance import surveillance
+from services.scoring import scoring_service
+from services.llm import llm_service
+from services.reporting import reporting_service
 
-    # Initialize database
-    models.Base.metadata.create_all(bind=engine)
-except Exception as e:
-    st.error(f"Critical Startup Error: {e}")
-    st.info("Debugging Information:")
-    import traceback
-    st.code(traceback.format_exc())
+# --- RESOURCE CACHING ---
+@st.cache_resource
+def init_db():
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        return True
+    except Exception as e:
+        return e
+
+db_status = init_db()
+if db_status is not True:
+    st.error(f"Critical Database Error: {db_status}")
     st.stop()
 
 # --- APP CONFIG ---
