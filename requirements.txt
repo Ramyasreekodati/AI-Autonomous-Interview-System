@@ -1,12 +1,8 @@
 streamlit
-fastapi
-uvicorn
 SQLAlchemy
+pydantic
+vaderSentiment
 reportlab
 python-jose[cryptography]
 passlib[bcrypt]
 numpy
-opencv-python-headless
-mediapipe
-pydantic
-vaderSentiment
