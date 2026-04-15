@@ -1,4 +1,3 @@
-from transformers import pipeline
 import random
 
 class LLMService:
@@ -7,9 +6,16 @@ class LLMService:
 
     @property
     def generator(self):
-        # Disabled for Streamlit Cloud to save RAM (1GB limit)
-        # return self._generator if self._generator != "FAILED" else None
-        return None
+        # We use lazy importing to prevent startup crashes if 'transformers' isn't installed
+        if self._generator is None:
+            try:
+                # Disabled by default on Streamlit Cloud to save RAM (1GB limit)
+                # from transformers import pipeline
+                # self._generator = pipeline("text-generation", model="distilgpt2")
+                self._generator = "DISABLED"
+            except ImportError:
+                self._generator = "FAILED"
+        return self._generator if self._generator not in ["DISABLED", "FAILED"] else None
 
     def generate_question(self, category="Technical", difficulty="Medium"):
         gen = self.generator
