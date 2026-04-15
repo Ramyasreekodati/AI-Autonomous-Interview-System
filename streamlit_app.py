@@ -26,18 +26,30 @@ except Exception as e:
     st.code(traceback.format_exc())
     st.stop()
 
-# --- RESOURCE CACHING ---
-@st.cache_resource
+# --- DATABASE INITIALIZATION ---
 def init_db():
     try:
-        models.Base.metadata.create_all(bind=engine)
+        # We explicitly ensure all models are registered by importing them
+        import models
+        from database import engine, Base
+        
+        # Create tables
+        Base.metadata.create_all(bind=engine)
+        
+        # Verify a table exists to be sure
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        if "candidates" not in inspector.get_table_names():
+            return "Table 'candidates' was not created successfully."
+            
         return True
     except Exception as e:
         return e
 
 db_status = init_db()
 if db_status is not True:
-    st.error(f"Critical Database Error: {db_status}")
+    st.error(f"🚨 Critical Database Optimization Error: {db_status}")
+    st.info("Rebooting the app via the dashboard may clear this environment glitch.")
     st.stop()
 
 # --- APP CONFIG ---
