@@ -84,94 +84,109 @@ const Interview = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-screen bg-slate-50">
       {/* Header */}
-      <header className="px-8 py-4 border-b border-border flex justify-between items-center glass">
-        <h2 className="text-xl font-bold gradient-text">RecruitAI Session</h2>
-        <div className="flex gap-4 items-center">
-          <span className="flex items-center gap-2 text-sm text-accent">
-            <CheckCircle className="w-4 h-4" /> Proctoring Live
-          </span>
-          <span className="text-sm text-text-muted">Interview ID: {interviewId}</span>
+      <header className="px-8 py-4 bg-white border-b border-slate-200 flex justify-between items-center sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+            <Video className="text-white w-5 h-5" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900">Session <span className="text-indigo-600">RecruitAI</span></h2>
+        </div>
+        <div className="flex gap-6 items-center">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-lg text-emerald-700 text-xs font-bold border border-emerald-100">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+            SECURE LIVE FEED
+          </div>
+          <span className="text-sm font-semibold text-slate-400">ID: {interviewId}</span>
         </div>
       </header>
 
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 p-8 overflow-hidden">
-        {/* Left: AI Monitor & Camera */}
-        <div className="flex flex-col gap-6">
-          <div className="glass-card flex-1 relative overflow-hidden p-0 rounded-2xl bg-black">
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 p-8 overflow-hidden">
+        {/* Left: AI Monitor & Camera (4 cols) */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          <div className="video-container flex-1">
             <video 
               ref={videoRef} 
               autoPlay 
               playsInline 
               muted 
-              className="w-full h-full object-cover rounded-2xl"
+              className="w-full h-full object-cover grayscale-[0.2]"
             />
             <canvas ref={canvasRef} className="hidden" />
-            <div className="absolute top-4 left-4 bg-red-500/80 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 animate-pulse">
-              <div className="w-2 h-2 bg-white rounded-full"></div> REC LIVE
-            </div>
             
-            <div className="absolute top-16 left-4 flex flex-col gap-2">
-              {alerts.map((alert, i) => (
-                <div key={i} className="bg-error/90 text-white text-[10px] px-2 py-1 rounded-md shadow-lg flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" /> {alert.type.replace(/_/g, ' ')}
-                </div>
+            <div className="absolute top-4 left-4 flex flex-col gap-2">
+              {alerts.length > 0 && alerts.map((alert, i) => (
+                <motion.div 
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  key={i} 
+                  className="bg-rose-500 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-lg shadow-xl flex items-center gap-2 border border-rose-400"
+                >
+                  <AlertCircle className="w-3.5 h-3.5" /> {alert.type.replace(/_/g, ' ').toUpperCase()}
+                </motion.div>
               ))}
             </div>
 
-            <div className="absolute bottom-4 left-4 right-4 flex gap-4">
-              <div className="glass p-3 rounded-xl flex-1 border border-white/10 backdrop-blur-md">
-                <p className="text-xs text-text-muted uppercase mb-1">Attention Score</p>
-                <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-primary h-full w-[85%]" />
+            <div className="absolute bottom-4 left-4 right-4 flex gap-3">
+              <div className="bg-black/60 backdrop-blur-md p-3 rounded-xl flex-1 border border-white/10">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Attention</p>
+                <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-indigo-400 h-full w-[85%] transition-all duration-500" />
                 </div>
               </div>
-              <div className="glass p-3 rounded-xl flex-1 border border-white/10 backdrop-blur-md">
-                <p className="text-xs text-text-muted uppercase mb-1">Emotion Detect</p>
-                <p className="text-sm font-bold text-accent">{currentEmotion}</p>
+              <div className="bg-black/60 backdrop-blur-md p-3 rounded-xl flex-1 border border-white/10">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Emotion</p>
+                <p className="text-sm font-bold text-white uppercase tracking-tight">{currentEmotion}</p>
               </div>
             </div>
           </div>
           
-          <div className="glass-card h-32 flex items-center gap-6 overflow-x-auto">
-             <div className="flex flex-col items-center">
-                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary mb-2">
-                    <Mic className="w-6 h-6" />
+          <div className="premium-card p-6 flex flex-col gap-4">
+             <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
+                      <Mic className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 uppercase tracking-wider">Audio Feed</p>
+                    <p className="text-[10px] font-medium text-emerald-500">OPTIMIZED</p>
+                  </div>
                 </div>
-                <span className="text-xs text-text-muted">Audio</span>
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
              </div>
-             <div className="flex flex-col items-center">
-                <div className="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center text-secondary mb-2">
-                    <Video className="w-6 h-6" />
+             <div className="h-px bg-slate-100" />
+             <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
+                      <Video className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 uppercase tracking-wider">Vision Engine</p>
+                    <p className="text-[10px] font-medium text-indigo-500">ACTIVE V2.0</p>
+                  </div>
                 </div>
-                <span className="text-xs text-text-muted">Vision</span>
-             </div>
-             <div className="border-l border-border h-12 ml-4 pl-8">
-                <p className="text-xs text-text-muted mb-1">System Status</p>
-                <p className="text-sm text-accent flex items-center gap-1 font-mono">
-                    ONLINE: AI ENGINE V2.1
-                </p>
+                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
              </div>
           </div>
         </div>
 
-        {/* Right: Question & Input */}
-        <div className="flex flex-col gap-6">
+        {/* Right: Question & Input (8 cols) */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
           <AnimatePresence mode="wait">
             {!loading && question && (
               <motion.div 
                 key={question.question_id}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="glass-card flex-1 flex flex-col"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="premium-card flex-1 flex flex-col"
               >
                 <div className="mb-8">
-                  <span className="bg-primary/20 text-primary text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                    Task Analysis
-                  </span>
-                  <h3 className="text-2xl font-bold mt-4 leading-relaxed">
+                  <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-extrabold uppercase tracking-widest rounded-md border border-indigo-100">
+                    Question Evaluation
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-900 mt-6 leading-relaxed">
                     {question.text}
                   </h3>
                 </div>
@@ -180,30 +195,35 @@ const Interview = () => {
                   <textarea 
                     value={answer}
                     onChange={(e) => setAnswer(e.target.value)}
-                    className="w-full h-full min-h-[200px] bg-surface-light border border-border rounded-xl p-6 focus:ring-2 focus:ring-primary focus:outline-none resize-none transition-all placeholder:text-white/10"
-                    placeholder="Speak your answer or type here..."
+                    className="input-field h-full min-h-[300px] text-lg leading-relaxed resize-none border-0 shadow-none bg-slate-50/50 p-6 focus:bg-white"
+                    placeholder="Provide your comprehensive response here..."
                   />
                 </div>
 
-                <div className="mt-8 flex justify-end gap-4">
+                <div className="mt-8 flex items-center justify-between">
+                  <p className="text-xs font-medium text-slate-400">
+                    Characters: {answer.length}
+                  </p>
                   <button 
                     onClick={handleSubmit} 
-                    className="btn-primary px-10 py-4 text-lg"
+                    disabled={!answer.trim()}
+                    className="btn-primary px-10 py-4 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Submit Response
+                    <CheckCircle className="w-5 h-5" />
                   </button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
           
-          <div className="glass-card p-4 border-l-4 border-error/50 flex items-center gap-4">
-             <div className="bg-error/20 p-2 rounded-lg text-error">
-                <AlertCircle className="w-6 h-6" />
+          <div className="premium-card p-5 border-l-4 border-l-rose-500 flex items-center gap-4 bg-rose-50/30">
+             <div className="bg-rose-100 p-2 rounded-xl text-rose-600">
+                <AlertCircle className="w-5 h-5" />
              </div>
              <div>
-                <p className="text-sm font-bold">Proctoring Notice</p>
-                <p className="text-xs text-text-muted">Avoid using external devices or looking away from the camera for extended periods.</p>
+                <p className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Integrity Watch</p>
+                <p className="text-xs font-medium text-slate-500">Ensure a quiet environment for the duration of the evaluation.</p>
              </div>
           </div>
         </div>

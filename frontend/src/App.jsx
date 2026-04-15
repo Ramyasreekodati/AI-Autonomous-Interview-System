@@ -8,7 +8,7 @@ import './index.css';
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-[#0a0a0c]">
+      <div className="min-h-screen">
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/interview/:id" element={<Interview />} />

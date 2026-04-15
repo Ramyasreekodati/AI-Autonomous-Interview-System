@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 from routers import interview, auth
 from services.surveillance import surveillance
-from database import get_db
+from database import get_db, engine
 import models
 from sqlalchemy.orm import Session
 from services.reporting import reporting_service
@@ -11,13 +11,21 @@ from fastapi import UploadFile, File, BackgroundTasks, WebSocket, WebSocketDisco
 from fastapi.responses import FileResponse
 from typing import List
 
+models.Base.metadata.create_all(bind=engine)
+
 app = FastAPI(title="AI Autonomous Interview System")
 print("DEBUG: MAIN.PY LOADED - AUTH ROUTER INCLUDED")
 
 # CORS Configuration
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

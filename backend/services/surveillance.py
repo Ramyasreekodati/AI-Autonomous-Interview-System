@@ -1,5 +1,4 @@
 import cv2
-import mediapipe as mp
 import numpy as np
 from sqlalchemy.orm import Session
 import models
@@ -8,12 +7,19 @@ from services.object_detection import object_detector
 
 class SurveillanceService:
     def __init__(self):
-        try:
-            self.mp_face_detection = mp.solutions.face_detection
-            self.face_detection = self.mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5)
-        except Exception as e:
-            print(f"Warning: MediaPipe solutions not found or failing: {e}")
-            self.face_detection = None
+        self._face_detection = None
+
+    @property
+    def face_detection(self):
+        if self._face_detection is None:
+            try:
+                import mediapipe as mp
+                self.mp_face_detection = mp.solutions.face_detection
+                self._face_detection = self.mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5)
+            except Exception as e:
+                print(f"Warning: MediaPipe solutions not found or failing: {e}")
+                self._face_detection = "FAILED"
+        return self._face_detection if self._face_detection != "FAILED" else None
 
     def process_frame(self, frame_bytes, interview_id: int, db: Session):
         # Convert bytes to numpy array
