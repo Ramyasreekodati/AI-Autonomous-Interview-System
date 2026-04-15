@@ -10,14 +10,21 @@ backend_path = os.path.abspath("backend")
 if backend_path not in sys.path:
     sys.path.append(backend_path)
 
-# Lazy imports wrapper for initialization
-import models
-from database import SessionLocal, engine
-from services.auth import auth_service
-from services.surveillance import surveillance
-from services.scoring import scoring_service
-from services.llm import llm_service
-from services.reporting import reporting_service
+# --- SECURE IMPORT BLOCK ---
+try:
+    import models
+    from database import SessionLocal, engine
+    from services.auth import auth_service
+    from services.surveillance import surveillance
+    from services.scoring import scoring_service
+    from services.llm import llm_service
+    from services.reporting import reporting_service
+except Exception as e:
+    st.error(f"🚨 CRITICAL IMPORT ERROR: {e}")
+    st.info("Check if your backend files are correctly structured or if there's a circular import.")
+    import traceback
+    st.code(traceback.format_exc())
+    st.stop()
 
 # --- RESOURCE CACHING ---
 @st.cache_resource
