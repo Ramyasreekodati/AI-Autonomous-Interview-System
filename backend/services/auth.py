@@ -8,7 +8,8 @@ SECRET_KEY = "SUPER_SECRET_KEY_FOR_AI_INTERVIEW_SYSTEM"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# pbkdf2_sha256 is used for better stability across environments like Streamlit Cloud
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 class AuthService:
     @staticmethod
