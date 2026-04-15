@@ -27,6 +27,7 @@ class Interview(Base):
 class Question(Base):
     __tablename__ = "questions"
     id = Column(Integer, primary_key=True, index=True)
+    interview_id = Column(Integer, ForeignKey("interviews.id"), nullable=True) # Associated interview
     text = Column(String)
     category = Column(String)
     difficulty = Column(String)

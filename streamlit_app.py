@@ -181,13 +181,29 @@ def dashboard_page():
     with col1:
         st.subheader("Your Interview Sessions")
     with col2:
-        if st.button("Start New Interview ✨", use_container_width=True):
+        # Check for existing pending/ongoing interview to reuse
+        db = get_db_session()
+        existing_itv = db.query(models.Interview).filter(
+            models.Interview.candidate_id == st.session_state.user['id'],
+            models.Interview.status.in_(['pending', 'ongoing'])
+        ).first()
+        db.close()
+
+        button_label = "Resume Interview ⏯️" if existing_itv else "Start New Interview ✨"
+        
+        if st.button(button_label, use_container_width=True):
             db = get_db_session()
-            new_interview = models.Interview(candidate_id=st.session_state.user['id'])
-            db.add(new_interview)
-            db.commit()
-            db.refresh(new_interview)
-            st.session_state.interview_id = new_interview.id
+            if existing_itv:
+                # Reuse existing
+                st.session_state.interview_id = existing_itv.id
+            else:
+                # Create new
+                new_interview = models.Interview(candidate_id=st.session_state.user['id'])
+                db.add(new_interview)
+                db.commit()
+                db.refresh(new_interview)
+                st.session_state.interview_id = new_interview.id
+            
             st.session_state.page = 'Interview'
             db.close()
             st.rerun()
