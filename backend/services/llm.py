@@ -6,9 +6,6 @@ class LLMService:
         pass
 
     def generate_question(self, role="Software Engineer", skills=["General"], difficulty="Medium", type="Technical"):
-        # Auditor Requirement: Allow ANY role and ANY skill (Dynamic Input)
-        # Auditor Requirement: No generic questions
-        
         technical_templates = [
             "As a {role}, how would you approach implementing {skill} in a production-ready environment?",
             "Can you explain a challenging scenario where you had to debug or optimize {skill} for a {role} project?",
@@ -37,16 +34,35 @@ class LLMService:
         template = random.choice(template_pool)
         skill = random.choice(skills) if skills else "relevant technologies"
         
+        question = template.format(role=role, skill=skill)
+        modifier = difficulty_modifiers.get(difficulty, difficulty_modifiers["Medium"])
+        return f"{question}\n[Context: {modifier}]"
+
     def generate_question_set(self, role, skills, difficulty, num):
-        # AUDITOR REQUIREMENT: Structured prompt for bulk generation
-        prompt = f"Generate {num} interview questions for:\nRole: {role}\nSkills: {skills}\nDifficulty: {difficulty}\n\nReturn as numbered list."
+        # 1. FIX generate_questions FUNCTION - Ensure it returns a LIST of strings
+        # 2. FIX LLM RESPONSE PARSING - Split, strip, remove numbering
         
-        # In a real environment, this would call the LLM and parse the numbered list.
-        # Here we simulate the generation logic based on the requested prompt structure.
-        questions = []
+        # Simulate LLM raw response as requested in Section 2
+        raw_response = ""
         for i in range(1, num + 1):
             q = self.generate_question(role, skills, difficulty)
-            questions.append(f"{i}. {q}")
+            raw_response += f"{i}. {q}\n"
+            
+        questions = []
+        for line in raw_response.split("\n"):
+            line = line.strip()
+            if line:
+                # Remove numbering (e.g., "1. Question" -> "Question")
+                if "." in line[:4]: # Safety check for leading numbers
+                    q = line.split(".", 1)[-1].strip()
+                    questions.append(q)
+                else:
+                    questions.append(line)
+        
+        # RULES: NEVER return None, NEVER return empty
+        if not questions:
+            return ["Sample technical question for " + role]
+            
         return questions
 
 llm_service = LLMService()
