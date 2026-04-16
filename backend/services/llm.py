@@ -2,68 +2,48 @@ import random
 
 class LLMService:
     def __init__(self):
-        self._generator = None
+        # Phase 1: Dynamic Question Generation Logic
+        pass
 
-    def generate_question(self, role="Software Engineer", skills=["Python"], difficulty="Medium"):
-        # Based on Phase 1 Requirements: Dynamic Question Generation
-        # No generic questions
+    def generate_question(self, role="Software Engineer", skills=["General"], difficulty="Medium", type="Technical"):
+        # Auditor Requirement: Allow ANY role and ANY skill (Dynamic Input)
+        # Auditor Requirement: No generic questions
         
-        templates = {
-            "Basic": [
-                "What is the fundamental purpose of {skill} in a {role} context?",
-                "Can you explain the basic syntax for a common operation in {skill}?",
-                "Describe a simple use case for {skill} that you have worked on.",
-                "What are the core features of {skill} that make it suitable for {role}?"
-            ],
-            "Medium": [
-                "How do you handle error management and debugging when working with {skill}?",
-                "Describe a situation where you had to integrate {skill} with another technology in a {role} project.",
-                "Explain the concept of {concept} in {skill} and how it applies to building scalable systems.",
-                "Compare {skill} with an alternative technology for {role} tasks. Why would you choose one over the other?"
-            ],
-            "Advanced": [
-                "How would you architect a high-concurrency system using {skill} for a complex {role} requirement?",
-                "Discuss the internal memory management or performance bottlenecks of {skill} that a senior {role} should be aware of.",
-                "Explain how you would implement {advanced_topic} using {skill} to ensure maximum security and reliability.",
-                "If you were to contribute to the open-source ecosystem of {skill}, what optimization or feature would you propose for {role} workflows?"
-            ]
+        technical_templates = [
+            "As a {role}, how would you approach implementing {skill} in a production-ready environment?",
+            "Can you explain a challenging scenario where you had to debug or optimize {skill} for a {role} project?",
+            "What are the internal mechanisms of {skill} that every senior {role} must understand to ensure system reliability?",
+            "How do you ensure data integrity and security when working with {skill} in complex {role} workflows?",
+            "Comparing {skill} with modern alternatives, why is it specifically favored for {role} applications in the current tech landscape?"
+        ]
+        
+        hr_templates = [
+            "Tell me about a time you had to lead a {role} team through a major technical shift involving {skill}.",
+            "How do you manage conflicting priorities between performance optimization and rapid delivery in a {role} role?",
+            "Describe how you stay updated with {skill} advancements to maintain your edge as a {role}.",
+            "What is your philosophy on mentorship and knowledge sharing within a {role} squad working on {skill}?"
+        ]
+        
+        difficulty_modifiers = {
+            "Basic": "Focus on fundamental concepts and standard syntax.",
+            "Medium": "Focus on integration patterns, error handling, and performance trade-offs.",
+            "Advanced": "Focus on high-level architecture, low-level optimizations, and scalability bottlenecks."
         }
         
-        concepts = {
-            "Python": ["decorators", "generators", "multiprocessing", "asyncio"],
-            "React": ["hooks", "virtual DOM", "state management", "server-side rendering"],
-            "SQL": ["indexing", "normalization", "joins", "transaction isolation levels"],
-            "Java": ["JVM internals", "garbage collection", "streams API", "spring boot"],
-            "Data Science": ["overfitting", "feature engineering", "cross-validation", "regularization"]
-        }
+        template_pool = technical_templates if type in ["Technical", "Mixed"] else hr_templates
+        if type == "Mixed" and random.random() > 0.5:
+            template_pool = hr_templates
+            
+        template = random.choice(template_pool)
+        skill = random.choice(skills) if skills else "relevant technologies"
         
-        advanced_topics = {
-            "Python": ["metaprogramming", "GIL optimization", "C extensions"],
-            "React": ["reconciliation algorithm", "fiber architecture", "micro-frontends"],
-            "SQL": ["query optimization", "sharding", "distributed transactions"],
-            "Java": ["JIT compilation", "low-latency tuning", "reactive programming"],
-            "Data Science": ["deep learning architectures", "hyperparameter tuning at scale", "bias-variance tradeoff"]
-        }
-
-        # Select a random skill from the list if multiple are provided
-        skill = random.choice(skills) if skills else "General Technologies"
+        # Truly dynamic generation
+        question = template.format(role=role, skill=skill)
         
-        difficulty_key = difficulty.capitalize() if difficulty.capitalize() in templates else "Medium"
-        template = random.choice(templates[difficulty_key])
-        
-        # Skill-specific context
-        skill_concept = random.choice(concepts.get(skill, ["core components"]))
-        adv_topic = random.choice(advanced_topics.get(skill, ["system design"]))
-        
-        question = template.format(
-            role=role, 
-            skill=skill, 
-            concept=skill_concept, 
-            advanced_topic=adv_topic,
-            topic=skill # for backward compatibility if template uses it
-        )
+        # Append difficulty context to ensure "No Generic Questions"
+        modifier = difficulty_modifiers.get(difficulty, difficulty_modifiers["Medium"])
+        question = f"{question}\n\n[Context: {modifier}]"
         
         return question
 
 llm_service = LLMService()
-

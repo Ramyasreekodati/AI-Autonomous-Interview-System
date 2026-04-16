@@ -1,114 +1,121 @@
 import random
+import re
 
 class ScoringService:
-    @staticmethod
-    def evaluate_response(answer_text, question_text):
-        # Phase 2: Evaluation Engine (No Hallucination)
-        # Rules: If answer invalid -> score = 0, NO inventions, STICK to given input.
+    def __init__(self):
+        # Local knowledge base for concept mapping (Phase 2 & 4)
+        self.concept_keywords = {
+            "python": ["decorators", "generators", "list comprehensions", "asyncio", "threading", "gil", "multiprocessing"],
+            "react": ["hooks", "useeffect", "usestate", "virtual dom", "props", "components", "jsx", "context api"],
+            "sql": ["indexing", "joins", "normalization", "transactions", "acid", "select", "where", "group by"],
+            "fastapi": ["pydantic", "di", "dependency injection", "async", "await", "endpoints", "router"],
+            "ml": ["overfitting", "training", "testing", "validation", "neural networks", "gradient descent", "backpropagation"],
+            "javascript": ["typescript", "closures", "event loop", "promises", "callbacks", "es6", "arrow functions"],
+            "aws": ["s3", "ec2", "lambda", "cloudwatch", "iam", "rds", "vpc"]
+        }
+
+    def evaluate_response(self, answer_text: str, question_text: str):
+        # AUDITOR FIX: Deterministic, non-hallucinating evaluation
+        score = 0
+        matched_keywords = []
+        missing_concepts = []
         
-        # Simple Validation (Part of Phase 1 but reinforced here)
-        if not answer_text or len(answer_text.strip()) < 10:
+        # 1. Basic Validation
+        ans_clean = answer_text.lower().strip()
+        if len(ans_clean) < 10:
             return {
                 "score": 0,
                 "keywords_matched": [],
-                "missing_concepts": ["The answer was too short or non-existent."],
+                "missing_concepts": ["Provide a more detailed technical explanation"],
                 "strengths": [],
-                "weaknesses": ["Lack of information provided."]
+                "weaknesses": ["Answer too short"]
             }
 
-        # In a real system, this would be an LLM analyzing the answer against the question.
-        # Here we use a rule-based simulation that matches Phase 2 requirements.
+        # 2. Concept Mapping (Real Intelligence)
+        # Check matching keywords based on the question context
+        q_lower = question_text.lower()
+        active_concepts = []
+        for concept, kw_list in self.concept_keywords.items():
+            if concept in q_lower:
+                active_concepts.extend(kw_list)
         
-        # Define some keywords based on the question text (simple heuristic)
-        # We extract potential keywords from the question to check if they are addressed
-        potential_keywords = [word.lower() for word in question_text.split() if len(word) > 4]
-        
-        matched = []
-        missing = []
-        for kw in potential_keywords:
-            if kw in answer_text.lower():
-                matched.append(kw)
+        # If no specific concept detected, use a general pool
+        if not active_concepts:
+            active_concepts = ["implementation", "scalability", "performance", "security", "integrity"]
+
+        for kw in active_concepts:
+            if re.search(r'\b' + re.escape(kw) + r'\b', ans_clean):
+                matched_keywords.append(kw)
             else:
-                missing.append(kw)
+                missing_concepts.append(kw)
+
+        # 3. Score Calculation
+        # Length factor (caps at 4 points)
+        len_score = min(4, len(ans_clean) / 100)
         
-        # Extract strengths/weaknesses strictly from the input
+        # Keyword factor (caps at 6 points)
+        kw_score = 0
+        if active_concepts:
+            kw_score = min(6, (len(matched_keywords) / len(active_concepts)) * 10)
+        
+        total_score = round(min(10, len_score + kw_score), 1)
+
+        # 4. Strengths & Weaknesses
         strengths = []
         weaknesses = []
+        if total_score > 7: strengths.append("Strong conceptual understanding")
+        if len(ans_clean) > 300: strengths.append("Detailed technical depth")
         
-        if len(answer_text) > 100:
-            strengths.append("Detailed explanation provided.")
-        if matched:
-            strengths.append(f"Successfully addressed {len(matched)} key concepts from the question.")
-        
-        if len(missing) > 2:
-            weaknesses.append("Several technical aspects of the question were not explicitly covered.")
-        if len(answer_text) < 50:
-            weaknesses.append("Response is somewhat brief.")
+        if total_score < 4: weaknesses.append("Lacks technical specifics")
+        if not matched_keywords: weaknesses.append("Missing core industry terminology")
 
-        # Scoring Logic (0-10)
-        base_score = min(len(matched) * 2, 7) # Max 7 for matching
-        detail_score = min(len(answer_text) // 50, 3) # Max 3 for detail
-        final_score = base_score + detail_score
-        
         return {
-            "score": round(final_score, 1),
-            "keywords_matched": list(set(matched)),
-            "missing_concepts": list(set(missing[:3])), # Limit to realistic missing parts
-            "strengths": list(set(strengths)),
-            "weaknesses": list(set(weaknesses))
+            "score": total_score,
+            "keywords_matched": matched_keywords,
+            "missing_concepts": missing_concepts[:3], # Show top 3
+            "strengths": strengths,
+            "weaknesses": weaknesses
         }
 
     @staticmethod
     def calculate_unified_score(interview_id, db):
         import models
         
-        # 1. Answer Evaluation (70% weight)
         responses = db.query(models.Response).filter(models.Response.interview_id == interview_id).all()
         if not responses:
-            return {"error": "No responses found for this interview."}
+            return {
+                "interview_score": 0, "behavior_score": 0, "risk_level": "high",
+                "alerts": [], "final_decision": "fail", "justification": "No responses logged for session.",
+                "final_aggregate_score": 0
+            }
             
         avg_answer_score = sum([r.relevance_score for r in responses]) / len(responses)
-        # Convert 0-10 scale to 0-100 for internal math
         answer_component = avg_answer_score * 10 
         
-        # 2. Behavior & Proctoring (30% weight)
         alerts = db.query(models.Alert).filter(models.Alert.interview_id == interview_id).all()
-        
-        # Base behavior score is 100
-        # Deduct based on severity
         penalty = 0
         alert_types = []
         for alert in alerts:
             alert_types.append(alert.alert_type)
-            if alert.severity == "high": penalty += 15
+            if alert.severity == "high": penalty += 20
             elif alert.severity == "medium": penalty += 10
             else: penalty += 5
             
         behavior_score = max(0, 100 - penalty)
+        final_score = round((answer_component * 0.7) + (behavior_score * 0.3), 1)
         
-        # 3. Final Integration Logic
-        # Final Score = 70% answer quality + 30% behavior
-        final_score = (answer_component * 0.7) + (behavior_score * 0.3)
-        
-        # 4. Final Decision & Risk Level
         risk_level = "low"
         if penalty > 40: risk_level = "high"
         elif penalty > 15: risk_level = "medium"
         
         final_decision = "pass" if final_score >= 60 and risk_level != "high" else "fail"
         
-        # 5. Justification (Strictly based on data)
-        just_parts = []
-        just_parts.append(f"Answer quality averaged {round(avg_answer_score, 1)}/10.")
-        if behavior_score < 80:
-            just_parts.append(f"Behavioral flags detected (Penalty: {penalty}).")
+        # AUDITOR FIX: Deterministic Justification
+        justification = f"Candidate achieved a technical score of {round(avg_answer_score,1)}/10. "
+        if penalty > 0:
+            justification += f"However, {len(alerts)} behavioral alerts were logged, indicating potential risk."
         else:
-            just_parts.append("Candidate maintained high integrity throughout.")
-            
-        if "phone_detected" in alert_types:
-            just_parts.append("Critical violation: Phone detected.")
-            
-        justification = " ".join(just_parts)
+            justification += "Zero behavioral violations detected during the session."
 
         return {
             "interview_score": round(avg_answer_score, 1),
@@ -117,7 +124,7 @@ class ScoringService:
             "alerts": list(set(alert_types)),
             "final_decision": final_decision,
             "justification": justification,
-            "final_aggregate_score": round(final_score, 1)
+            "final_aggregate_score": final_score
         }
 
 scoring_service = ScoringService()

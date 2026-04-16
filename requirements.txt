@@ -12,3 +12,9 @@ opencv-python-headless
 mediapipe
 pydantic
 vaderSentiment
+openai-whisper
+torch
+python-multipart
+python-dotenv
+googlesearch-python
+requests

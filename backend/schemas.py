@@ -32,6 +32,8 @@ class InterviewStart(BaseModel):
     skills: List[str]
     difficulty: str
     num_questions: Optional[int] = 5
+    interview_type: Optional[str] = "Technical"
+    audio_mode: Optional[bool] = False
 
 class ResponseCreate(BaseModel):
     question_id: int
