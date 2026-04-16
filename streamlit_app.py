@@ -35,7 +35,7 @@ st.set_page_config(
     layout="wide",
 )
 
-# Custom CSS for Phase 1-3 Fix & Premium Audit Compliance
+# Custom CSS for Phase 1-5 Final Production
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
@@ -85,199 +85,239 @@ st.markdown("""
         transform: translateY(-2px);
         box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.2);
     }
-
-    .status-badge {
-        padding: 4px 12px;
-        border-radius: 9999px;
-        font-size: 10px;
-        font-weight: 800;
-        text-transform: uppercase;
-        background: #f1f5f9;
-        color: #64748b;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# --- SESSION STATE ---
-if 'interview_id' not in st.session_state:
-    st.session_state.interview_id = None
-if 'q_idx' not in st.session_state:
-    st.session_state.q_idx = 0
-if 'page' not in st.session_state:
-    st.session_state.page = 'Setup'
-if 'candidate_info' not in st.session_state:
+# --------------------------------------------------
+# SESSION INITIALIZATION
+# --------------------------------------------------
+if "started" not in st.session_state:
+    st.session_state.started = False
+if "questions" not in st.session_state:
+    st.session_state.questions = []
+if "current_q" not in st.session_state:
+    st.session_state.current_q = 0
+if "answers" not in st.session_state:
+    st.session_state.answers = {}
+if "scores" not in st.session_state:
+    st.session_state.scores = {}
+if "candidate_info" not in st.session_state:
     st.session_state.candidate_info = {"name": "", "email": ""}
+if "interview_id" not in st.session_state:
+    st.session_state.interview_id = None
+if "status" not in st.session_state:
+    st.session_state.status = "Setup"
 
-# --- SIDEBAR (LEFT PANEL REDESIGN) ---
+# --- SIDEBAR (LEFT PANEL) ---
 with st.sidebar:
-    st.markdown('<h1 class="gradient-text" style="font-size: 2rem; margin-bottom: 2rem;">RecruitAI</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="gradient-text" style="font-size: 2rem;">RecruitAI</h1>', unsafe_allow_html=True)
+    st.markdown("---")
     
-    if st.session_state.page == 'Setup':
-        st.markdown("<p class='status-badge'>System Configuration</p>", unsafe_allow_html=True)
+    if not st.session_state.started:
         st.subheader("👤 Candidate Info")
-        c_name = st.text_input("Full Name", placeholder="e.g. John Doe", key="in_name")
-        c_email = st.text_input("Work Email", placeholder="e.g. john@company.com", key="in_email")
+        cl_name = st.text_input("Full Name", placeholder="e.g. John Doe")
+        cl_email = st.text_input("Work Email", placeholder="e.g. john@company.com")
         
         st.markdown("---")
         st.subheader("⚙️ Interview Config")
-        role = st.text_input("Target Role", placeholder="e.g. Backend Engineer, UI Architect")
-        preset_skills = ["Python", "React", "SQL", "ML", "FastAPI"]
-        selected_presets = st.multiselect("Select Core Skills", preset_skills)
-        custom_skills = st.text_input("Add Custom Skills (comma separated)", placeholder="e.g. GraphQL, AWS, Docker")
-        all_skills = list(set(selected_presets + [s.strip() for s in custom_skills.split(",") if s.strip()]))
-        
-        col_c1, col_c2 = st.columns(2)
-        with col_c1:
-            difficulty = st.selectbox("Difficulty", ["Basic", "Medium", "Advanced"], index=1)
-        with col_c2:
-            num_q = st.number_input("Questions", 1, 20, 5)
-            
-        itv_type = st.selectbox("Interview Type", ["Technical", "HR", "Mixed"])
-        st.markdown("---")
-        st.subheader("🛠️ Features")
-        audio_toggle = st.toggle("Audio Input Mode", value=False)
-        timer_toggle = st.toggle("Enable Session Timer", value=True)
+        role = st.text_input("Target Role", placeholder="e.g. Frontend Engineer")
+        skills = st.text_input("Core Skills", placeholder="React, CSS, TypeScript")
+        diff = st.selectbox("Difficulty Level", ["Basic", "Medium", "Advanced"], index=1)
+        num_q = st.number_input("Number of Questions", 1, 20, 5)
 
-        if st.button("Launch Session", use_container_width=True):
-            if not c_name or not c_email or not role or not all_skills:
-                st.error("Please provide name, email, role, and at least one skill.")
+        if st.button("Launch Session"):
+            if not cl_name or not cl_email or not role or not skills:
+                st.error("Missing mandatory configuration.")
             else:
-                with st.spinner("Initializing AI Session..."):
-                    st.session_state.candidate_info = {"name": c_name, "email": c_email}
+                with st.spinner("Synthesizing Interview Environment..."):
+                    st.session_state.candidate_info = {"name": cl_name, "email": cl_email}
                     db = get_db_session()
-                    candidate = db.query(models.Candidate).filter(models.Candidate.email == c_email).first()
-                    if not candidate:
-                        candidate = models.Candidate(name=c_name, email=c_email)
-                        db.add(candidate)
+                    
+                    # 1. Register Candidate
+                    cand = db.query(models.Candidate).filter(models.Candidate.email == cl_email).first()
+                    if not cand:
+                        cand = models.Candidate(name=cl_name, email=cl_email)
+                        db.add(cand)
                         db.commit()
-                        db.refresh(candidate)
+                        db.refresh(cand)
                     
-                    interview = models.Interview(candidate_id=candidate.id, status="ongoing")
-                    db.add(interview)
+                    # 2. Start Interview Session
+                    itv = models.Interview(candidate_id=cand.id, status="ongoing")
+                    db.add(itv)
                     db.commit()
-                    db.refresh(interview)
+                    db.refresh(itv)
+                    st.session_state.interview_id = itv.id
                     
-                    for _ in range(num_q):
-                        q_text = llm_service.generate_question(role=role, skills=all_skills, difficulty=difficulty, type=itv_type)
-                        question = models.Question(interview_id=interview.id, text=q_text, category=role, difficulty=difficulty)
-                        db.add(question)
+                    # 3. Phase 1: Question Generation
+                    q_list = llm_service.generate_question_set(role, [s.strip() for s in skills.split(",")], diff, num_q)
+                    
+                    # Persist questions to DB for Phase 4 summary
+                    for q_text in q_list:
+                        new_q = models.Question(interview_id=itv.id, text=q_text)
+                        db.add(new_q)
                     db.commit()
-                    
-                    st.session_state.interview_id = interview.id
-                    st.session_state.page = 'Interview'
-                    st.session_state.q_idx = 0
                     db.close()
+                    
+                    st.session_state.questions = q_list
+                    st.session_state.started = True
+                    st.session_state.current_q = 0
+                    st.session_state.answers = {}
+                    st.session_state.scores = {}
+                    st.session_state.status = "Interview"
                     st.rerun()
     else:
-        st.markdown("<p class='status-badge' style='background: #dcfce7; color: #166534;'>Active Evaluation</p>", unsafe_allow_html=True)
-        st.markdown(f"**Candidate:** {st.session_state.candidate_info['name']}")
-        st.markdown(f"**Session ID:** `{st.session_state.interview_id}`")
+        st.success("Session Active")
+        st.write(f"**Candidate:** {st.session_state.candidate_info['name']}")
+        st.write(f"**Session ID:** `{st.session_state.interview_id}`")
         if st.button("Terminate Session"):
-            st.session_state.page = 'Setup'
-            st.session_state.interview_id = None
+            st.session_state.started = False
+            st.session_state.status = "Setup"
             st.rerun()
 
-# --- MAIN PANEL ---
-if st.session_state.page == 'Setup':
-    st.write("")
-    st.write("")
-    st.markdown("<h1 style='font-size: 5rem; font-weight: 800; line-height: 1; letter-spacing: -3px;'>Autonomous <span class='gradient-text'>Hiring.</span></h1>", unsafe_allow_html=True)
-    st.markdown("<p style='font-size: 1.5rem; color: #64748b; margin: 2rem 0; max-width: 700px;'>RecruitAI is a localized, non-hallucinating interview system designed for high-integrity technical assessments.</p>", unsafe_allow_html=True)
+# --- PAGES ---
 
-elif st.session_state.page == 'Interview':
+def show_homepage():
+    st.markdown("<h1 style='font-size: 5rem; font-weight: 800; line-height: 1; letter-spacing: -3px;'>Autonomous <span class='gradient-text'>Hiring.</span></h1>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size: 1.5rem; color: #64748b; margin: 2rem 0; max-width: 700px;'>RecruitAI is a localized, non-hallucinating interview system. Use the sidebar to configure the candidate's technical profile.</p>", unsafe_allow_html=True)
+    st.info("👈 Complete the configuration in the left panel to trigger the AI question generator.")
+
+def show_interview():
     db = get_db_session()
-    questions = db.query(models.Question).filter(models.Question.interview_id == st.session_state.interview_id).all()
+    # Map questions to their DB IDs for storage
+    db_questions = db.query(models.Question).filter(models.Question.interview_id == st.session_state.interview_id).all()
     
-    if st.session_state.q_idx >= len(questions):
-        st.session_state.page = 'Result'
+    if st.session_state.current_q >= len(st.session_state.questions):
+        st.session_state.status = "Result"
         db.close()
         st.rerun()
-        
-    curr_q = questions[st.session_state.q_idx]
-    st.progress((st.session_state.q_idx + 1) / len(questions))
-    st.markdown(f"<p style='color: #64748b; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.1rem; text-transform: uppercase;'>Question {st.session_state.q_idx + 1} of {len(questions)}</p>", unsafe_allow_html=True)
+        return
+
+    q_text = st.session_state.questions[st.session_state.current_q]
+    curr_q_db = db_questions[st.session_state.current_q]
     
-    st.markdown(f"""<div class="main-card"><h2 style="margin-top: 0; font-size: 2rem; color: #1e293b; line-height: 1.2;">{curr_q.text}</h2></div>""", unsafe_allow_html=True)
+    st.progress((st.session_state.current_q + 1) / len(st.session_state.questions))
+    st.markdown(f"**Question {st.session_state.current_q + 1} of {len(st.session_state.questions)}**")
+
+    st.markdown(f"""
+    <div class="main-card">
+        <h2 style="margin-top: 0; font-size: 2rem; color: #1e293b;">{q_text}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
     st.write("")
     
     col_input, col_proctor = st.columns([2, 1], gap="large")
+    
     with col_input:
-        existing_res = db.query(models.Response).filter(models.Response.interview_id == st.session_state.interview_id, models.Response.question_id == curr_q.id).first()
-        ans_text = st.text_area("Your Detailed Response", height=300, value=existing_res.answer_text if existing_res else "", placeholder="Explain your answer with technical examples...")
+        ans_key = f"answer_{st.session_state.current_q}"
+        ans_text = st.text_area("Your Response", height=300, key=ans_key)
         
-        if existing_res and existing_res.relevance_score > 0:
-            with st.expander("📝 Previous AI Evaluation"):
-                st.write(f"**Score:** {existing_res.relevance_score}/10")
-                st.caption("Detailed feedback will be available in the final executive report.")
+        # Phase 2: Show instant score if navigating back
+        if st.session_state.current_q in st.session_state.scores:
+            st.info(f"Previous AI Score: {st.session_state.scores[st.session_state.current_q]}/10")
 
-        c_nav1, c_nav2 = st.columns([1, 1])
-        with c_nav1:
-            if st.button("Previous Question") and st.session_state.q_idx > 0:
-                st.session_state.q_idx -= 1
-                st.rerun()
-        with c_nav2:
+        col_nav1, col_nav2 = st.columns([1, 1])
+        with col_nav1:
+            if st.session_state.current_q > 0:
+                if st.button("← Previous"):
+                    st.session_state.current_q -= 1
+                    st.rerun()
+                    
+        with col_nav2:
             if st.button("Submit & Next →"):
                 if not ans_text.strip():
-                    st.warning("Assessment requires an answer to proceed.")
+                    st.warning("Please provide a technical explanation.")
                 else:
                     with st.spinner("AI evaluating response..."):
-                        eval_res = scoring_service.evaluate_response(ans_text, curr_q.text)
+                        # Phase 2: Evaluation Engine
+                        eval_res = scoring_service.evaluate_response(ans_text, q_text)
+                        
+                        # Store in session
+                        st.session_state.answers[st.session_state.current_q] = ans_text
+                        st.session_state.scores[st.session_state.current_q] = eval_res['score']
+                        
+                        # Phase 1: Unique Answer Storage (Sync to DB)
+                        existing_res = db.query(models.Response).filter(
+                            models.Response.interview_id == st.session_state.interview_id,
+                            models.Response.question_id == curr_q_db.id
+                        ).first()
+                        
                         if existing_res:
                             existing_res.answer_text = ans_text
                             existing_res.relevance_score = eval_res['score']
                         else:
-                            db_res = models.Response(interview_id=st.session_state.interview_id, question_id=curr_q.id, answer_text=ans_text, relevance_score=eval_res['score'])
+                            db_res = models.Response(
+                                interview_id=st.session_state.interview_id,
+                                question_id=curr_q_db.id,
+                                answer_text=ans_text,
+                                relevance_score=eval_res['score']
+                            )
                             db.add(db_res)
                         db.commit()
-                        st.success(f"Response analyzed. AI Score: {eval_res['score']}/10")
+                        
+                        st.success(f"Analysed. Score: {eval_res['score']}/10")
                         if eval_res['missing_concepts']:
-                            st.info(f"Insight: Consider covering {', '.join(eval_res['missing_concepts'])} for a higher score.")
-                        time.sleep(1.5)
-                        st.session_state.q_idx += 1
+                            st.caption(f"Tip: Focus more on {', '.join(eval_res['missing_concepts'])}")
+                        
+                        time.sleep(1)
+                        st.session_state.current_q += 1
                         st.rerun()
 
     with col_proctor:
-        st.markdown("<div style='background: #0f172a; padding: 1.5rem; border-radius: 24px; color: white;'><p style='font-size: 10px; font-weight: 800; color: #94a3b8;'>LIVE SURVEILLANCE</p>", unsafe_allow_html=True)
-        cam_feed = st.camera_input("Maintain focus on the screen")
-        if cam_feed:
-            with st.spinner("Analyzing Feed..."):
-                proc_data = surveillance.process_frame(cam_feed.getvalue(), st.session_state.interview_id, db)
-                st.markdown(f"**Gaze:** `{proc_data.get('gaze', 'N/A')}`")
-                st.markdown(f"**Emotion:** `{proc_data.get('emotion', 'N/A')}`")
-                if proc_data.get('alerts'):
-                    for alert in proc_data['alerts']:
-                        st.toast(f"🚨 {alert['alert_type'].replace('_', ' ').capitalize()}", icon="🚩")
-                        st.error(f"Violation: {alert['alert_type'].replace('_', ' ')}")
-                else:
-                    st.success("Integrity Verified ✅")
-        st.caption("Gaze and emotions tracked in real-time.")
+        st.markdown("<div style='background: #0f172a; padding: 1.5rem; border-radius: 24px; color: white;'>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 10px; font-weight: 800; color: #94a3b8;'>LIVE SURVEILLANCE</p>", unsafe_allow_html=True)
+        cam = st.camera_input("Monitoring feed active")
+        if cam:
+            # Phase 3: AI Proctoring
+            res = surveillance.process_frame(cam.getvalue(), st.session_state.interview_id, db)
+            st.markdown(f"**Gaze:** `{res.get('gaze', 'Center')}`")
+            st.markdown(f"**Emotion:** `{res.get('emotion', 'Neutral')}`")
+            if res.get('alerts'):
+                st.toast(f"Alert: {res['alerts'][0]['alert_type']}", icon="⚠️")
         st.markdown("</div>", unsafe_allow_html=True)
     db.close()
 
-elif st.session_state.page == 'Result':
+def show_result():
     db = get_db_session()
+    # Phase 4: System Integration (Unified Scoring)
     results = scoring_service.calculate_unified_score(st.session_state.interview_id, db)
-    st.markdown("<h1 style='font-size: 4rem; text-align: center; margin-bottom: 2rem;'>Session <span class='gradient-text'>Audit</span></h1>", unsafe_allow_html=True)
+    
+    st.markdown("<h1 style='text-align: center; font-size: 3rem;'>Session <span class='gradient-text'>Analysis</span></h1>", unsafe_allow_html=True)
+    
     c1, c2, c3 = st.columns(3)
-    c1.metric("Tech Accuracy", f"{results['interview_score']}/10")
-    c2.metric("Behavior Score", f"{results['behavior_score']}%")
-    c3.metric("Final Risk", results['risk_level'].upper())
+    c1.metric("Tech Quality", f"{results['interview_score']}/10")
+    c2.metric("Integrity", f"{results['behavior_score']}%")
+    c3.metric("Risk Level", results['risk_level'].upper())
+    
     st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-    st.subheader("Data-Driven Justification")
-    st.write(results['justification'])
+    st.subheader("Executive AI Justification")
+    st.info(results['justification'])
+    
     if results['alerts']:
         st.write("---")
-        st.subheader("Integrity Alerts")
+        st.subheader("Logged Integrity Alerts")
         for alert in results['alerts']:
             st.error(f"🚩 {alert.replace('_', ' ').capitalize()}")
-    if st.button("Generate Executive Report (PDF)", use_container_width=True):
-        candidate_name = st.session_state.candidate_info['name']
-        pdf_path = reporting_service.generate_report(candidate_name, results)
-        with open(pdf_path, "rb") as f:
-            st.download_button("Download Report Ahora", f, file_name=os.path.basename(pdf_path))
+            
+    # Phase 5: Production Reporting
+    if st.button("Generate Executive PDF Report", use_container_width=True):
+        path = reporting_service.generate_report(st.session_state.candidate_info['name'], results)
+        with open(path, "rb") as f:
+            st.download_button("Download Report Now", f, file_name=os.path.basename(path))
+    
     st.markdown("</div>", unsafe_allow_html=True)
-    if st.button("Start New Audit"):
-        st.session_state.page = 'Setup'
-        st.session_state.interview_id = None
+    
+    if st.button("New Audit Session"):
+        st.session_state.started = False
+        st.session_state.status = "Setup"
         st.rerun()
     db.close()
+
+# --- MAIN ROUTER ---
+if not st.session_state.started:
+    show_homepage()
+else:
+    if st.session_state.status == "Result":
+        show_result()
+    else:
+        show_interview()
