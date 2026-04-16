@@ -20,22 +20,27 @@ except Exception as e:
     st.stop()
 
 # --- APP CONFIG ---
-st.set_page_config(page_title="RecruitAI - Engine Core", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="RecruitAI - Phase-Based Core", page_icon="🤖", layout="wide")
 
 # --------------------------------------------------
-# SYSTEM STATE CONTROL (PHASE LOGIC IN CODE)
+# SYSTEM STATE CONTROL (STRICT PHASE EXECUTION)
 # --------------------------------------------------
 if "app_state" not in st.session_state:
-    st.session_state.app_state = "HOME" # HOME -> INTERVIEW -> COMPLETED
+    st.session_state.app_state = "HOME"
 
+# Phase 1 Data (Generation + Storage)
 if "questions" not in st.session_state:
     st.session_state.questions = []
-
+if "answers" not in st.session_state:
+    st.session_state.answers = {}
 if "current_q" not in st.session_state:
     st.session_state.current_q = 0
 
-if "answers" not in st.session_state:
-    st.session_state.answers = {}
+# Phase 2 & 4 Data (Evaluation + Results)
+if "evaluations" not in st.session_state:
+    st.session_state.evaluations = {}
+if "final_results" not in st.session_state:
+    st.session_state.final_results = None
 
 if "candidate_info" not in st.session_state:
     st.session_state.candidate_info = {"name": "", "email": ""}
@@ -57,104 +62,138 @@ with st.sidebar:
                 st.error("Missing mandatory data.")
             else:
                 st.session_state.candidate_info = {"name": c_name, "email": c_email}
-                
-                # PYTHON CONTROLS SYSTEM (Phase 1)
-                with st.spinner("AI Engine generating questions..."):
+                # Phase 1: Question Generation
+                with st.spinner("Ph1: Generating questions..."):
                     skill_list = [s.strip() for s in skills.split(",")]
                     questions = ai_engine.generate_questions(role, skill_list, diff, count)
-                    
                     if not questions:
-                        st.error("Engine failed to generate questions.")
+                        st.error("Engine failed.")
                         st.stop()
-                    
                     st.session_state.questions = questions
                     st.session_state.current_q = 0
                     st.session_state.answers = {}
-                    st.session_state.app_state = "INTERVIEW"
+                    st.session_state.app_state = "PHASE1_INTERVIEW"
                     st.rerun()
     else:
-        st.success(f"State: {st.session_state.app_state}")
+        st.success(f"Execution: {st.session_state.app_state}")
         st.write(f"Candidate: {st.session_state.candidate_info['name']}")
-        if st.button("Reset Session"):
-            st.session_state.app_state = "HOME"
+        if st.button("Reset Entire System"):
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
             st.rerun()
 
-# --- MAIN PANEL CONTROLLER ---
+# --- PHASE CONTROLLERS ---
 
 def show_homepage():
-    st.markdown("# Welcome to RecruitAI")
-    st.info("👈 Use the Configuration Sidebar to initialize the AI Evaluation Engine.")
+    st.markdown("# RecruitAI: Autonomous Interview System")
+    st.info("Configure the sidebar to trigger Phase 1 (Data Collection).")
 
-def show_interview_ui():
-    # Progress & Question Logic
+def run_phase1_interview():
+    # PHASE 1: Data Collection & Answer Storage
     curr_idx = st.session_state.current_q
     total = len(st.session_state.questions)
     
     if curr_idx >= total:
-        st.session_state.app_state = "COMPLETED"
+        # Move to PHASE 2
+        st.session_state.app_state = "PHASE2_EVALUATION"
         st.rerun()
         return
 
-    q_text = st.session_state.questions[curr_idx]
-    
     st.progress((curr_idx + 1) / total)
-    st.subheader(f"Question {curr_idx + 1} of {total}")
+    st.subheader(f"Phase 1: Interview Context ({curr_idx + 1}/{total})")
     
+    q_text = st.session_state.questions[curr_idx]
     st.markdown(f"### {q_text}")
     
-    # SYSTEM STATE: Store answers
     ans_key = f"ans_{curr_idx}"
-    answer = st.text_area("Your Response", height=200, key=ans_key)
-    st.session_state.answers[curr_idx] = answer
+    default_ans = st.session_state.answers.get(curr_idx, "")
+    answer = st.text_area("Your Response", height=200, key=ans_key, value=default_ans)
+    
+    # Store Answer (Phase 1 Isolation)
+    if answer:
+        st.session_state.answers[curr_idx] = answer
     
     col_nav1, col_nav2 = st.columns([1,1])
     with col_nav1:
-        if curr_idx > 0 and st.button("← Previous"):
+        if curr_idx > 0 and st.button("← Back"):
             st.session_state.current_q -= 1
             st.rerun()
     with col_nav2:
-        if st.button("Submit & Next →"):
+        if st.button("Store & Next →"):
             if not answer.strip():
-                st.warning("Please provide an answer.")
+                st.warning("No data provided for storage.")
             else:
-                # Evaluation (Call ONLY when needed)
-                evaluation = ai_engine.evaluate_answer(answer, q_text)
-                st.toast(f"AI Score: {evaluation['score']}/10", icon="📝")
-                
                 st.session_state.current_q += 1
                 st.rerun()
 
-    # Proctoring (Code Control)
-    with st.expander("🎥 Surveillance Monitor", expanded=True):
-        cam = st.camera_input("System Monitoring")
-        if cam:
-            # Code interacts with backend for proctoring
-            pass
+    # PHASE 3: (Future/Active) Proctoring
+    with st.expander("🎥 Surveillance Hub", expanded=False):
+        st.camera_input("Active Session Monitoring")
 
-def show_completed_ui():
-    st.header("Assessment Complete")
-    st.write("Synthesizing final executive report...")
+def run_phase2_evaluation():
+    # PHASE 2: Evaluate Answers
+    # PHASE 4: Combine Results
+    st.header("Phase 2 & 4: Deep Analysis & Synthesis")
+    st.write("The system is now processing stored data. No user input required.")
     
-    results = {
-        "interview_score": 8.5,
-        "behavior_score": 100,
-        "risk_level": "low",
-        "alerts": [],
-        "justification": "Candidate demonstrated strong engineering thinking in 3/3 questions."
+    progress_bar = st.progress(0)
+    total = len(st.session_state.questions)
+    
+    evals = {}
+    for i in range(total):
+        q = st.session_state.questions[i]
+        a = st.session_state.answers.get(i, "No response.")
+        
+        st.write(f"Analyzing Q{i+1}...")
+        evals[i] = ai_engine.evaluate_answer(a, q)
+        progress_bar.progress((i + 1) / total)
+    
+    st.session_state.evaluations = evals
+    
+    # PHASE 4: Combine Results (Synthetic Logic)
+    avg_score = sum([e['score'] for e in evals.values()]) / total
+    st.session_state.final_results = {
+        "interview_score": round(avg_score, 1),
+        "behavior_score": 100, # Mock
+        "risk_level": "low" if avg_score > 6 else "medium",
+        "justification": f"Candidate averaged {round(avg_score, 1)}/10 across technical assessment."
     }
     
-    st.json(results)
+    st.success("Analysis Complete.")
+    if st.button("Generate Final Report"):
+        st.session_state.app_state = "PHASE5_REPORT"
+        st.rerun()
+
+def run_phase5_report():
+    # PHASE 5: UI + Reports
+    st.header("Phase 5: Executive Assessment Report")
     
-    if st.button("Download Final Report (PDF)"):
-        # Reporting linkage
+    results = st.session_state.final_results
+    if not results:
+        st.error("No data found to report.")
+        st.stop()
+        
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Tech Quality", f"{results['interview_score']}/10")
+    c2.metric("Behavior Integrity", f"{results['behavior_score']}%")
+    c3.metric("Risk Status", results['risk_level'].upper())
+    
+    st.markdown("---")
+    st.subheader("Automated Synthesis")
+    st.write(results['justification'])
+    
+    # Report Generation (Independent of active UI logic, dependent ONLY on session_state data)
+    if st.button("Export Standard PDF"):
         path = reporting_service.generate_report(st.session_state.candidate_info['name'], results)
         with open(path, "rb") as f:
             st.download_button("Download Now", f, file_name=os.path.basename(path))
 
-# --- ROUTER ---
+# --- MAIN ROUTER ---
 if st.session_state.app_state == "HOME":
     show_homepage()
-elif st.session_state.app_state == "INTERVIEW":
-    show_interview_ui()
-elif st.session_state.app_state == "COMPLETED":
-    show_completed_ui()
+elif st.session_state.app_state == "PHASE1_INTERVIEW":
+    run_phase1_interview()
+elif st.session_state.app_state == "PHASE2_EVALUATION":
+    run_phase2_evaluation()
+elif st.session_state.app_state == "PHASE5_REPORT":
+    run_phase5_report()
