@@ -2,144 +2,134 @@ import streamlit as st
 import datetime
 import os
 import sys
+import uuid
 
-# --- BACKEND PATH CONFIG ---
+# --- SYSTEM SETUP ---
 backend_path = os.path.abspath("backend")
 if backend_path not in sys.path:
     sys.path.append(backend_path)
 
 try:
     from services.ai_engine import ai_engine
-    from services.surveillance import surveillance
-    from services.reporting import reporting_service
 except ImportError:
-    st.error("Missing architecture services.")
+    st.error("Engine missing. Ensure ai_engine.py exists in backend/services/")
     st.stop()
 
+st.set_page_config(page_title="RecruitAI - Phase 1 & 2 Core", page_icon="🤖", layout="wide")
+
 # --------------------------------------------------
-# SYSTEM ARCHITECTURE: PHASE MANAGER CLASS
-# (CODE CONTROLS THE SYSTEM)
+# 1. 💾 DATA STORAGE & SESSION ISOLATION
 # --------------------------------------------------
+if "session_id" not in st.session_state:
+    st.session_state.session_id = f"SES_{str(uuid.uuid4())[:8].upper()}"
 
-class PhaseManager:
-    """
-    Enforces the strict 5-Phase architecture through Python logic.
-    Decouples the system flow from AI prompts.
-    """
-    def __init__(self):
-        self._initialize_state()
+if "current_phase" not in st.session_state:
+    st.session_state.current_phase = "SETUP"
 
-    def _initialize_state(self):
-        if "phase" not in st.session_state:
-            st.session_state.phase = 1
-        if "db" not in st.session_state:
-            st.session_state.db = {
-                "questions": [],
-                "answers": {}, # Index -> {text, time}
-                "evals": {},
-                "meta": {}
-            }
+if "questions" not in st.session_state:
+    st.session_state.questions = []
 
-    @property
-    def current_phase(self):
-        return st.session_state.phase
+if "answers" not in st.session_state:
+    st.session_state.answers = {} 
 
-    def set_phase(self, phase_id):
-        # BLOCKING LOGIC: Cannot jump ahead without data
-        if phase_id == 2 and not st.session_state.db["answers"]:
-            st.error("Phase 1 not complete: No answers stored.")
-            return
-        st.session_state.phase = phase_id
-        st.rerun()
+if "evaluations" not in st.session_state:
+    st.session_state.evaluations = {}
 
-    def run_phase_1(self):
-        """PHASE 1: Question Generation & Answer Storage"""
-        st.header("Phase 1: Knowledge Acquisition")
-        
-        # Setup (If no questions yet)
-        if not st.session_state.db["questions"]:
-            with st.container(border=True):
-                role = st.text_input("Role")
-                skills = st.text_input("Skills")
-                if st.button("Initialize Interview"):
-                    # CODE triggers generation
-                    qs = ai_engine.generate_questions_cached(role, skills, "Medium", 3)
-                    st.session_state.db["questions"] = qs
-                    st.session_state.db["meta"] = {"role": role, "candidate": "Candidate_A"}
-                    st.rerun()
-            return
+if "q_idx" not in st.session_state:
+    st.session_state.q_idx = 0
 
-        # Core Interview Loop
-        qs = st.session_state.db["questions"]
-        idx = len(st.session_state.db["answers"])
-        
-        if idx < len(qs):
-            st.subheader(f"Question {idx + 1}")
-            st.info(qs[idx])
-            ans = st.text_area("Response", key=f"ans_{idx}")
-            if st.button("Store & Next"):
-                if ans.strip():
-                    # INDEXED STORAGE (PHASE 1 Requirement)
-                    st.session_state.db["answers"][idx] = {
-                        "text": ans,
-                        "timestamp": datetime.datetime.now().isoformat()
-                    }
-                    st.rerun()
+# --------------------------------------------------
+# 2. 🔁 LOGIC LAYER
+# --------------------------------------------------
+def validate_answer(text):
+    clean_text = text.strip()
+    if not clean_text or len(clean_text) < 5:
+        return False
+    if clean_text.lower() in ["abc", "xyz", "qwerty", "asdf", "12345"]:
+        return False
+    return True
+
+def save_phase1_data(idx, question, answer):
+    st.session_state.answers[idx] = {
+        "session_id": st.session_state.session_id,
+        "question_id": idx,
+        "question": question,
+        "answer": answer,
+        "timestamp": datetime.datetime.now().isoformat()
+    }
+
+# --------------------------------------------------
+# 3. UI: PHASE 0 (SETUP)
+# --------------------------------------------------
+if st.session_state.current_phase == "SETUP":
+    st.title("🚀 AI Interview System Setup")
+    with st.sidebar:
+        st.subheader("Candidate Info")
+        name = st.text_input("Name")
+        role = st.text_input("Role", "Software Engineer")
+        skills = st.text_input("Skills", "Python, SQL")
+        diff = st.selectbox("Difficulty", ["Basic", "Medium", "Advanced"], index=1)
+        count = st.number_input("Question Count", 1, 10, value=3)
+
+    if st.button("Launch Phase 1 Interview →", use_container_width=True):
+        if name and skills:
+            st.session_state.questions = ai_engine.generate_questions_cached(role, skills, diff, count)
+            st.session_state.current_phase = "INTERVIEW"
+            st.rerun()
         else:
-            st.success("Phase 1 complete. All data points stored in indexed DB.")
-            if st.button("Proceed to Phase 2 >>"):
-                self.set_phase(2)
+            st.error("Please provide mandatory configuration.")
 
-    def run_phase_2(self):
-        """PHASE 2: Automated Analysis"""
-        st.header("Phase 2: Technical Evaluation")
-        db = st.session_state.db
-        if not db["evals"]:
-            with st.spinner("Processing stored responses..."):
-                for i, q in enumerate(db["questions"]):
-                    ans = db["answers"][i]["text"]
-                    # CODE triggers evaluation
-                    db["evals"][i] = ai_engine.evaluate_answer(q, ans)
-            st.success("Phase 2 Complete.")
+# --------------------------------------------------
+# 4. UI: PHASE 1 (INTERVIEW ROOM)
+# --------------------------------------------------
+elif st.session_state.current_phase == "INTERVIEW":
+    idx = st.session_state.q_idx
+    total = len(st.session_state.questions)
+    
+    if idx < total:
+        st.progress((idx + 1) / total, text=f"Question {idx + 1} of {total}")
+        q_text = st.session_state.questions[idx]
+        st.markdown(f"### {q_text}")
         
-        if st.button("Proceed to Phase 4 >>"):
-            self.set_phase(4)
-
-    def run_phase_4(self):
-        """PHASE 4: System Integration"""
-        st.header("Phase 4: Global Synthesis")
-        db = st.session_state.db
-        if "final" not in db:
-            # CODE combines results
-            res = ai_engine.generate_final_result(db["evals"], []) 
-            db["final"] = res
-            st.success("Phase 4 Complete: Results Integrated.")
+        default_val = st.session_state.answers.get(idx, {}).get("answer", "")
+        ans_input = st.text_area("Your Response", height=250, key=f"ans_{idx}", value=default_val)
         
-        if st.button("Proceed to Phase 5: Result >>"):
-            self.set_phase(5)
-
-    def run_phase_5(self):
-        """PHASE 5: Final Hiring Report"""
-        st.header("Phase 5: Executive Assessment")
-        res = st.session_state.db["final"]
-        st.json(res)
-        if st.button("Reset Architecture"):
-            st.session_state.clear()
+        c1, c2 = st.columns(2)
+        with c1:
+            if idx > 0 and st.button("← Previous"):
+                st.session_state.q_idx -= 1
+                st.rerun()
+        with col2 := c2:
+            if st.button("Confirm & Next →", use_container_width=True):
+                if validate_answer(ans_input):
+                    save_phase1_data(idx, q_text, ans_input)
+                    st.session_state.q_idx += 1
+                    st.rerun()
+                else:
+                    st.error("Invalid response detected.")
+    else:
+        st.success("✔ PHASE 1 COMPLETE")
+        # 🔗 PHASE 2 TRANSITION
+        if st.button("🚀 Execute Phase 2: Evaluation Engine", use_container_width=True):
+            with st.spinner("Analyzing data signals..."):
+                for q_id, data in st.session_state.answers.items():
+                    res = ai_engine.evaluate_answer(data["question"], data["answer"])
+                    st.session_state.evaluations[q_id] = res
+            st.session_state.current_phase = "EVALUATION"
             st.rerun()
 
 # --------------------------------------------------
-# MAIN EXECUTION (ACTUAL ARCHITECTURE)
+# 5. UI: PHASE 2 (EVALUATION STREAM)
 # --------------------------------------------------
-
-st.set_page_config(page_title="RecruitAI Core Architecture")
-manager = PhaseManager()
-
-# CODE CONTROLS THE FLOW
-if manager.current_phase == 1:
-    manager.run_phase_1()
-elif manager.current_phase == 2:
-    manager.run_phase_2()
-elif manager.current_phase == 4:
-    manager.run_phase_4()
-elif manager.current_phase == 5:
-    manager.run_phase_5()
+elif st.session_state.current_phase == "EVALUATION":
+    st.header("🎯 Phase 2: Intel Evaluation Summary")
+    st.info("Technical assessments generated strictly from stored data signals.")
+    
+    # 📦 DISPLAY STRICT JSON (Audit verification)
+    for q_id, res in st.session_state.evaluations.items():
+        with st.expander(f"Question {q_id + 1} Assessment", expanded=True):
+            st.json(res)
+    
+    if st.button("Reset Session"):
+        st.session_state.clear()
+        st.rerun()
