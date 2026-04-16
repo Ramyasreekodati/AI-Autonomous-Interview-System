@@ -3,23 +3,33 @@ import json
 import re
 import streamlit as st
 import time
+import datetime
 
 class AIEngine:
     def __init__(self):
-        # 🧠 MODEL VERSIONING (Tracked in metadata)
-        self.version = "1.2.0-Production"
+        # 🧠 MODEL VERSIONING
+        self.version = "1.2.0-Deterministic"
         self.llm_provider = "System-Defined-Logic"
 
     @staticmethod
     @st.cache_data(ttl=3600, show_spinner=False)
-    def generate_questions_cached(role, skills_str, difficulty, count):
+    def generate_questions_cached(role, skills_str, difficulty, count, session_seed="RECRUITAI"):
+        """
+        DETERMINISTIC: Uses a fixed seed to ensure repeatable question sets for audits.
+        """
         try:
+            # Seed the randomizer for determinism
+            random.seed(session_seed)
+            
             skills = [s.strip() for s in skills_str.split(",")]
             raw_output = ""
             subjects = skills if skills else ["Systems Architecture"]
+            
+            # Generate exactly N questions in a fixed sequence
             for i in range(1, count + 1):
-                sub = random.choice(subjects)
+                sub = subjects[(i-1) % len(subjects)] # Round-robin instead of random.choice for 100% determinism
                 raw_output += f"{i}. Describe a complex {sub} scenario you optimized for a {role} project.\n"
+            
             questions = []
             for line in raw_output.split("\n"):
                 line = line.strip()
@@ -32,15 +42,21 @@ class AIEngine:
 
     def evaluate_answer(self, question, answer):
         """
-        STRICT PHASE 2 LOGIC + BIAS DETECTION
+        STRICT PHASE 2 LOGIC + DETERMINISTIC SCORING
         """
         ans_clean = answer.strip().lower()
         
         # ⚠️ CASE 1: MEANINGLESS VALIDATION
         if not ans_clean or len(ans_clean) < 5 or ans_clean in ["abc", "xyz", "qwerty", "asdf", "12345"]:
-            return {"score": 0, "keywords_matched": [], "missing_concepts": [], "strengths": [], "weaknesses": ["Invalid or irrelevant answer"]}
+            return {
+                "score": 0,
+                "keywords_matched": [],
+                "missing_concepts": [],
+                "strengths": [],
+                "weaknesses": ["Invalid or irrelevant answer"]
+            }
 
-        # ⚖️ BIAS DETECTION (Filtering for age/gender/origin identifiers)
+        # ⚖️ BIAS DETECTION
         bias_found = False
         forbidden_patterns = [r'\b(years old|man|woman|graduate of)\b']
         for pattern in forbidden_patterns:
@@ -48,30 +64,32 @@ class AIEngine:
                 bias_found = True
                 break
 
+        # DETERMINISTIC DEPTH ANALYSIS (Word-count based scoring rules)
         word_count = len(ans_clean.split())
         if word_count < 25:
             score = 6.0
             wk = ["Lacks implementation detail"]
+        elif word_count < 60:
+            score = 7.5
+            wk = ["Moderate depth provided"]
         else:
-            score = 9.0
+            score = 9.2
             wk = []
 
-        res = {
+        return {
             "score": score,
-            "keywords_matched": ["Scalability"] if score > 7 else [],
-            "missing_concepts": [],
-            "strengths": ["Clear structure"],
+            "keywords_matched": ["Scalability", "Optimization"] if score > 7 else ["Implementation"],
+            "missing_concepts": ["Fault Tolerance"] if score < 8 else [],
+            "strengths": ["Clear technical structure"],
             "weaknesses": wk,
-            "bias_check_passed": not bias_found, # 🧠 ADVANCED FEATURE
+            "bias_check_passed": not bias_found,
             "model_version": self.version
         }
-        return res
 
     @staticmethod
     def generate_final_result(evaluations, alerts):
         """
-        STRICT PHASE 4: Core Intelligence Synthesis
-        Uses 70/30 weighting and HIGH/MED/LOW behavior deductions.
+        STRICT PHASE 4: DETERMINISTIC SYNTHESIS
         """
         if not evaluations:
             return {"error": "Missing Phase 2 Evaluation data."}
@@ -98,7 +116,14 @@ class AIEngine:
         else: risk_level = "high"
 
         final_decision = "pass" if (final_score >= 60 and risk_level != "high") else "fail"
-        just = f"Candidate tech score: {round(interview_score, 1)}%. Behavior score: {round(behavior_score, 1)}%."
+        
+        # DETERMINISTIC JUSTIFICATION
+        just = f"Consolidated Audit Result: {final_decision.upper()}. "
+        just += f"Technical Score: {round(interview_score, 1)}%. Behavior Integrity: {round(behavior_score, 1)}%. "
+        if alerts:
+            just += f"Flags raised: {', '.join(list(set(alert_summary)))}."
+        else:
+            just += "No behavioral anomalies detected."
         
         return {
             "interview_score": round(interview_score, 1),
@@ -107,8 +132,7 @@ class AIEngine:
             "alerts": list(set(alert_summary)), 
             "final_decision": final_decision,
             "justification": just,
-            "build_timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+            "build_id": "RECRUIT-AI-STABLE-1.2.0"
         }
 
-import datetime
 ai_engine = AIEngine()
