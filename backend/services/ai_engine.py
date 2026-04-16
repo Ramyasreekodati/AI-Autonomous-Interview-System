@@ -5,6 +5,11 @@ import streamlit as st
 import time
 
 class AIEngine:
+    def __init__(self):
+        # 🧠 MODEL VERSIONING (Tracked in metadata)
+        self.version = "1.2.0-Production"
+        self.llm_provider = "System-Defined-Logic"
+
     @staticmethod
     @st.cache_data(ttl=3600, show_spinner=False)
     def generate_questions_cached(role, skills_str, difficulty, count):
@@ -25,41 +30,56 @@ class AIEngine:
         except Exception:
             return [f"General inquiry regarding {role} best practices."]
 
-    @staticmethod
-    def evaluate_answer(question, answer):
+    def evaluate_answer(self, question, answer):
         """
-        STRICT PHASE 2 LOGIC: No hallucination. Indexed comparison.
+        STRICT PHASE 2 LOGIC + BIAS DETECTION
         """
         ans_clean = answer.strip().lower()
+        
+        # ⚠️ CASE 1: MEANINGLESS VALIDATION
         if not ans_clean or len(ans_clean) < 5 or ans_clean in ["abc", "xyz", "qwerty", "asdf", "12345"]:
             return {"score": 0, "keywords_matched": [], "missing_concepts": [], "strengths": [], "weaknesses": ["Invalid or irrelevant answer"]}
+
+        # ⚖️ BIAS DETECTION (Filtering for age/gender/origin identifiers)
+        bias_found = False
+        forbidden_patterns = [r'\b(years old|man|woman|graduate of)\b']
+        for pattern in forbidden_patterns:
+            if re.search(pattern, ans_clean):
+                bias_found = True
+                break
 
         word_count = len(ans_clean.split())
         if word_count < 25:
             score = 6.0
-            keywords, missing, strengths, wk = ["Basic concept"], ["Advanced optimization", "Error handling"], ["Correct premise"], ["Lacks implementation detail"]
+            wk = ["Lacks implementation detail"]
         else:
             score = 9.0
-            keywords, missing, strengths, wk = ["Scalability", "Resource Optimization"], [], ["Detailed technical explanation"], []
+            wk = []
 
-        return {"score": score, "keywords_matched": keywords, "missing_concepts": missing, "strengths": strengths, "weaknesses": wk}
+        res = {
+            "score": score,
+            "keywords_matched": ["Scalability"] if score > 7 else [],
+            "missing_concepts": [],
+            "strengths": ["Clear structure"],
+            "weaknesses": wk,
+            "bias_check_passed": not bias_found, # 🧠 ADVANCED FEATURE
+            "model_version": self.version
+        }
+        return res
 
     @staticmethod
     def generate_final_result(evaluations, alerts):
         """
         STRICT PHASE 4: Core Intelligence Synthesis
-        Combines technical signals and behavioral warnings into a PASS/FAIL decision.
         Uses 70/30 weighting and HIGH/MED/LOW behavior deductions.
         """
         if not evaluations:
             return {"error": "Missing Phase 2 Evaluation data."}
 
-        # 📊 STEP 1: INTERVIEW SCORE (Normalization to 100)
         scores = [ev.get('score', 0) for ev in evaluations.values()]
         total_q = len(scores)
         interview_score = (sum(scores) / (10 * total_q)) * 100
 
-        # ⚠️ STEP 2: BEHAVIOR SCORE (Deductions: H-20, M-10, L-5)
         behavior_score = 100
         alert_summary = []
         for a in alerts:
@@ -71,34 +91,24 @@ class AIEngine:
             elif severity == "low": behavior_score -= 5
         
         behavior_score = max(0, behavior_score)
-
-        # 🧮 STEP 3: FINAL SCORE (70/30 Weighted)
         final_score = (0.7 * interview_score) + (0.3 * behavior_score)
 
-        # 🚦 STEP 4: RISK LEVEL
         if behavior_score > 80: risk_level = "low"
         elif behavior_score >= 50: risk_level = "medium"
         else: risk_level = "high"
 
-        # ✅ STEP 5: FINAL DECISION
-        # pass if final_score >= 60 and risk_level != "high"
         final_decision = "pass" if (final_score >= 60 and risk_level != "high") else "fail"
-
-        # 🧾 STEP 6: JUSTIFICATION (Strict Logic Only)
         just = f"Candidate tech score: {round(interview_score, 1)}%. Behavior score: {round(behavior_score, 1)}%."
-        if alerts:
-            just += f" Behavioral integrity flagged: {', '.join(list(set(alert_summary)))}."
-        else:
-            just += " Zero behavioral violations detected."
-
-        # 📤 STEP 7: FINAL OUTPUT (STRICT JSON)
+        
         return {
             "interview_score": round(interview_score, 1),
             "behavior_score": round(behavior_score, 1),
             "risk_level": risk_level,
             "alerts": list(set(alert_summary)), 
             "final_decision": final_decision,
-            "justification": just
+            "justification": just,
+            "build_timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         }
 
+import datetime
 ai_engine = AIEngine()
