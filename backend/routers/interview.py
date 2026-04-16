@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas
@@ -6,58 +6,97 @@ from services.stt import stt_service
 from services.scoring import scoring_service
 from services.llm import llm_service
 import os
-from fastapi import UploadFile, File
+import datetime
+from typing import List
 
 router = APIRouter(prefix="/interview", tags=["interview"])
 
 @router.post("/start")
-def start_interview(candidate_email: str, db: Session = Depends(get_db)):
-    candidate = db.query(models.Candidate).filter(models.Candidate.email == candidate_email).first()
+def start_interview(data: schemas.InterviewStart, db: Session = Depends(get_db)):
+    candidate = db.query(models.Candidate).filter(models.Candidate.email == data.candidate_email).first()
     if not candidate:
-        candidate = models.Candidate(name="Guest", email=candidate_email)
+        candidate = models.Candidate(name=data.candidate_name, email=data.candidate_email)
         db.add(candidate)
         db.commit()
         db.refresh(candidate)
     
-    interview = models.Interview(candidate_id=candidate.id, status="ongoing")
+    interview = models.Interview(
+        candidate_id=candidate.id, 
+        status="ongoing",
+    )
     db.add(interview)
     db.commit()
     db.refresh(interview)
-    return {"interview_id": interview.id, "message": "Interview started"}
-
-@router.get("/{interview_id}/next-question")
-def get_next_question(interview_id: int, db: Session = Depends(get_db)):
-    # Simple logic: get a random question not yet answered
-    answered_q_ids = db.query(models.Response.question_id).filter(models.Response.interview_id == interview_id).all()
-    answered_q_ids = [q[0] for q in answered_q_ids]
     
-    # End interview after 5 questions for this demo
-    if len(answered_q_ids) >= 5:
-        # Update interview status to completed
-        interview = db.query(models.Interview).filter(models.Interview.id == interview_id).first()
-        if interview:
-            interview.status = "completed"
-            db.commit()
+    # Pre-generate questions for this session to ensure "Navigation Logic" works smoothly
+    for i in range(data.num_questions):
+        q_text = llm_service.generate_question(role=data.role, skills=data.skills, difficulty=data.difficulty)
+        question = models.Question(interview_id=interview.id, text=q_text, category=data.role, difficulty=data.difficulty)
+        db.add(question)
+    
+    db.commit()
+    
+    return {"interview_id": interview.id, "message": "Interview started", "total_questions": data.num_questions}
+
+@router.get("/{interview_id}/question/{question_index}")
+def get_question_by_index(interview_id: int, question_index: int, db: Session = Depends(get_db)):
+    # Phase 1: Navigation Logic - Retrieve question by index
+    questions = db.query(models.Question).filter(models.Question.interview_id == interview_id).all()
+    if question_index < 0 or question_index >= len(questions):
         return {"finished": True}
     
-    question = db.query(models.Question).filter(~models.Question.id.in_(answered_q_ids)).first()
-    if not question:
-        # Generate a new question on the fly
-        text = llm_service.generate_question()
-        new_q = models.Question(text=text, category="AI-Generated")
-        db.add(new_q)
-        db.commit()
-        db.refresh(new_q)
-        question = new_q
+    question = questions[question_index]
     
-    return {"question_id": question.id, "text": question.text, "finished": False}
+    # Check if there's already a response for this question in this session
+    existing_response = db.query(models.Response).filter(
+        models.Response.interview_id == interview_id,
+        models.Response.question_id == question.id
+    ).first()
+    
+    return {
+        "question_id": question.id,
+        "text": question.text,
+        "previous_answer": existing_response.answer_text if existing_response else "",
+        "finished": False,
+        "total": len(questions)
+    }
 
 @router.post("/{interview_id}/submit-response")
 def submit_response(interview_id: int, question_id: int, answer_text: str, db: Session = Depends(get_db)):
-    response = models.Response(interview_id=interview_id, question_id=question_id, answer_text=answer_text)
-    db.add(response)
+    # Phase 1: Validation
+    if not answer_text or len(answer_text.strip()) < 3:
+        raise HTTPException(status_code=400, detail="Answer is empty or too short.")
+    
+    # Phase 2: Evaluation Engine (Strictly based on input)
+    question = db.query(models.Question).filter(models.Question.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+        
+    evaluation = scoring_service.evaluate_response(answer_text, question.text)
+    
+    # Phase 1: Unique Answer Storage (update if exists)
+    response = db.query(models.Response).filter(
+        models.Response.interview_id == interview_id,
+        models.Response.question_id == question_id
+    ).first()
+    
+    if response:
+        response.answer_text = answer_text
+        response.timestamp = datetime.datetime.utcnow()
+        response.relevance_score = evaluation["score"]
+    else:
+        response = models.Response(
+            interview_id=interview_id, 
+            question_id=question_id, 
+            answer_text=answer_text,
+            relevance_score=evaluation["score"]
+        )
+        db.add(response)
+    
     db.commit()
-    return {"message": "Response submitted"}
+    
+    # Phase 2 REQUIREMENT: RETURN ONLY JSON
+    return evaluation
 
 @router.post("/{interview_id}/submit-audio")
 async def submit_audio_response(interview_id: int, question_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):

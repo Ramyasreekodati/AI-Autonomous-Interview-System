@@ -38,6 +38,7 @@ class Response(Base):
     interview_id = Column(Integer, ForeignKey("interviews.id"))
     question_id = Column(Integer, ForeignKey("questions.id"))
     answer_text = Column(String)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
     sentiment_score = Column(Float, default=0.0)
     relevance_score = Column(Float, default=0.0)
     interview = relationship("Interview", back_populates="responses")

@@ -9,7 +9,7 @@ class QuestionBase(BaseModel):
 class Question(QuestionBase):
     id: int
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CandidateCreate(BaseModel):
     name: str
@@ -23,7 +23,15 @@ class Interview(BaseModel):
     id: int
     status: str
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+class InterviewStart(BaseModel):
+    candidate_name: str
+    candidate_email: str
+    role: str
+    skills: List[str]
+    difficulty: str
+    num_questions: Optional[int] = 5
 
 class ResponseCreate(BaseModel):
     question_id: int

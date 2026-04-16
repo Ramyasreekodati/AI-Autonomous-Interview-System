@@ -1,233 +1,261 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Video, AlertCircle, CheckCircle } from 'lucide-react';
 import axios from 'axios';
+import { 
+  Mic, 
+  Type, 
+  ChevronLeft, 
+  ChevronRight, 
+  Send,
+  Loader2,
+  AlertCircle,
+  Clock,
+  CheckCircle2
+} from 'lucide-react';
 
 const Interview = () => {
-  const { id: interviewId } = useParams();
+  const { id } = useParams();
   const navigate = useNavigate();
-  const [question, setQuestion] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [answer, setAnswer] = useState('');
-  const [surveillanceStatus, setSurveillanceStatus] = useState('Active');
-  const [alerts, setAlerts] = useState([]);
-  const [currentEmotion, setCurrentEmotion] = useState('Neutral');
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [questionData, setQuestionData] = useState(null);
+  const [answer, setAnswer] = useState("");
+  const [inputMode, setInputMode] = useState("text"); // 'text' or 'audio'
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    fetchNextQuestion();
-    startCamera();
-    const interval = setInterval(captureFrame, 3000); // Capture every 3 seconds
-    return () => clearInterval(interval);
-  }, []);
+    fetchQuestion(0);
+  }, [id]);
 
-  const captureFrame = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    
-    canvas.toBlob(async (blob) => {
-      const formData = new FormData();
-      formData.append('file', blob, 'frame.jpg');
-      
-      try {
-        const response = await axios.post(`http://localhost:8000/proctoring/process_frame?interview_id=${interviewId}`, formData);
-        setAlerts(response.data.alerts);
-        setCurrentEmotion(response.data.emotion);
-      } catch (err) {
-        console.error("Proctoring error", err);
-      }
-    }, 'image/jpeg');
-  };
-
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      if (videoRef.current) videoRef.current.srcObject = stream;
-    } catch (err) {
-      console.error("Camera access denied", err);
-    }
-  };
-
-  const fetchNextQuestion = async () => {
+  const fetchQuestion = async (index) => {
     setLoading(true);
+    setError("");
+    setSuccess("");
     try {
-      const response = await axios.get(`http://localhost:8000/interview/${interviewId}/next-question`);
+      const response = await axios.get(`http://localhost:8000/interview/${id}/question/${index}`);
       if (response.data.finished) {
-        navigate(`/dashboard/${interviewId}`);
-      } else {
-        setQuestion(response.data);
+        navigate(`/result/${id}`);
+        return;
       }
+      setQuestionData(response.data);
+      setAnswer(response.data.previous_answer || "");
+      setQuestionIndex(index);
     } catch (err) {
+      setError("Failed to load question. Make sure backend is running.");
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async () => {
+  const handleNext = async () => {
+    if (!answer.trim()) {
+      setError("Please provide an answer before moving to the next question.");
+      return;
+    }
+    
+    setSubmitting(true);
+    setError("");
     try {
-      await axios.post(`http://localhost:8000/interview/${interviewId}/submit-response`, null, {
-        params: { question_id: question.question_id, answer_text: answer }
+      const response = await axios.post(`http://localhost:8000/interview/${id}/submit-response`, null, {
+        params: {
+          question_id: questionData.question_id,
+          answer_text: answer
+        }
       });
-      setAnswer('');
-      fetchNextQuestion();
+      
+      if (response.data.status === "invalid") {
+        setError("Invalid input detected. Please provide a meaningful answer.");
+        setSubmitting(false);
+        return;
+      }
+
+      setSuccess("Answer saved!");
+      setTimeout(() => {
+        fetchQuestion(questionIndex + 1);
+      }, 500);
     } catch (err) {
-      console.error(err);
+      setError(err.response?.data?.detail || "Submission failed.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  const handlePrevious = () => {
+    if (questionIndex > 0) {
+      fetchQuestion(questionIndex - 1);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+        <p className="text-gray-500 font-medium">Loading session data...</p>
+      </div>
+    );
+  }
+
+  const progress = questionData ? ((questionIndex + 1) / questionData.total) * 100 : 0;
+
   return (
-    <div className="flex flex-col h-screen bg-slate-50">
-      {/* Header */}
-      <header className="px-8 py-4 bg-white border-b border-slate-200 flex justify-between items-center sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
-            <Video className="text-white w-5 h-5" />
+    <div className="max-w-5xl mx-auto px-4 py-12 animate-slide-up">
+      {/* Header & Progress */}
+      <div className="mb-12">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+              Question {questionIndex + 1} of {questionData?.total}
+            </span>
           </div>
-          <h2 className="text-xl font-bold text-slate-900">Session <span className="text-indigo-600">RecruitAI</span></h2>
-        </div>
-        <div className="flex gap-6 items-center">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-lg text-emerald-700 text-xs font-bold border border-emerald-100">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            SECURE LIVE FEED
-          </div>
-          <span className="text-sm font-semibold text-slate-400">ID: {interviewId}</span>
-        </div>
-      </header>
-
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 p-8 overflow-hidden">
-        {/* Left: AI Monitor & Camera (4 cols) */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
-          <div className="video-container flex-1">
-            <video 
-              ref={videoRef} 
-              autoPlay 
-              playsInline 
-              muted 
-              className="w-full h-full object-cover grayscale-[0.2]"
-            />
-            <canvas ref={canvasRef} className="hidden" />
-            
-            <div className="absolute top-4 left-4 flex flex-col gap-2">
-              {alerts.length > 0 && alerts.map((alert, i) => (
-                <motion.div 
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  key={i} 
-                  className="bg-rose-500 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-lg shadow-xl flex items-center gap-2 border border-rose-400"
-                >
-                  <AlertCircle className="w-3.5 h-3.5" /> {alert.type.replace(/_/g, ' ').toUpperCase()}
-                </motion.div>
-              ))}
-            </div>
-
-            <div className="absolute bottom-4 left-4 right-4 flex gap-3">
-              <div className="bg-black/60 backdrop-blur-md p-3 rounded-xl flex-1 border border-white/10">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Attention</p>
-                <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-indigo-400 h-full w-[85%] transition-all duration-500" />
-                </div>
-              </div>
-              <div className="bg-black/60 backdrop-blur-md p-3 rounded-xl flex-1 border border-white/10">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Emotion</p>
-                <p className="text-sm font-bold text-white uppercase tracking-tight">{currentEmotion}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="premium-card p-6 flex flex-col gap-4">
-             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
-                      <Mic className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 uppercase tracking-wider">Audio Feed</p>
-                    <p className="text-[10px] font-medium text-emerald-500">OPTIMIZED</p>
-                  </div>
-                </div>
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-             </div>
-             <div className="h-px bg-slate-100" />
-             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
-                      <Video className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 uppercase tracking-wider">Vision Engine</p>
-                    <p className="text-[10px] font-medium text-indigo-500">ACTIVE V2.0</p>
-                  </div>
-                </div>
-                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-             </div>
+          <div className="flex items-center gap-2 text-gray-400 text-sm font-medium">
+            <Clock className="w-4 h-4" />
+            Live Session
           </div>
         </div>
+        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-blue-600 transition-all duration-500 ease-out"
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
+      </div>
 
-        {/* Right: Question & Input (8 cols) */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
-          <AnimatePresence mode="wait">
-            {!loading && question && (
-              <motion.div 
-                key={question.question_id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="premium-card flex-1 flex flex-col"
-              >
-                <div className="mb-8">
-                  <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-extrabold uppercase tracking-widest rounded-md border border-indigo-100">
-                    Question Evaluation
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Panel: Question & Input */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="premium-card min-h-[500px] flex flex-col">
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-gray-900 mb-8 leading-tight">
+                {questionData?.text}
+              </h1>
+
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl flex items-center gap-3 text-sm animate-shake">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              {success && (
+                <div className="mb-6 p-4 bg-green-50 border border-green-100 text-green-600 rounded-2xl flex items-center gap-3 text-sm">
+                  <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                  {success}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="input-label mb-0">Your Response</label>
+                  <div className="flex bg-gray-100 p-1 rounded-xl">
+                    <button 
+                      onClick={() => setInputMode("text")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                        inputMode === "text" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500"
+                      }`}
+                    >
+                      <Type className="w-3.5 h-3.5" /> Keyboard
+                    </button>
+                    <button 
+                      onClick={() => setInputMode("audio")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                        inputMode === "audio" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500"
+                      }`}
+                    >
+                      <Mic className="w-3.5 h-3.5" /> Voice
+                    </button>
                   </div>
-                  <h3 className="text-2xl font-bold text-slate-900 mt-6 leading-relaxed">
-                    {question.text}
-                  </h3>
                 </div>
 
-                <div className="flex-1">
-                  <textarea 
+                {inputMode === "text" ? (
+                  <textarea
+                    className="input-field min-h-[250px] resize-none p-6 text-lg"
+                    placeholder="Type your detailed answer here..."
                     value={answer}
                     onChange={(e) => setAnswer(e.target.value)}
-                    className="input-field h-full min-h-[300px] text-lg leading-relaxed resize-none border-0 shadow-none bg-slate-50/50 p-6 focus:bg-white"
-                    placeholder="Provide your comprehensive response here..."
-                  />
-                </div>
+                  ></textarea>
+                ) : (
+                  <div className="min-h-[250px] flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50 p-10">
+                    <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-6 cursor-pointer hover:bg-blue-200 transition-colors group">
+                      <Mic className="text-blue-600 w-8 h-8 group-active:scale-90 transition-transform" />
+                    </div>
+                    <p className="text-gray-500 font-medium">Click to Start Recording</p>
+                    <p className="text-xs text-gray-400 mt-2">Phase 1: Recording UI Only</p>
+                  </div>
+                )}
+              </div>
+            </div>
 
-                <div className="mt-8 flex items-center justify-between">
-                  <p className="text-xs font-medium text-slate-400">
-                    Characters: {answer.length}
-                  </p>
-                  <button 
-                    onClick={handleSubmit} 
-                    disabled={!answer.trim()}
-                    className="btn-primary px-10 py-4 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Submit Response
-                    <CheckCircle className="w-5 h-5" />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          
-          <div className="premium-card p-5 border-l-4 border-l-rose-500 flex items-center gap-4 bg-rose-50/30">
-             <div className="bg-rose-100 p-2 rounded-xl text-rose-600">
-                <AlertCircle className="w-5 h-5" />
-             </div>
-             <div>
-                <p className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Integrity Watch</p>
-                <p className="text-xs font-medium text-slate-500">Ensure a quiet environment for the duration of the evaluation.</p>
-             </div>
+            {/* Navigation */}
+            <div className="mt-12 flex justify-between items-center bg-gray-50 -mx-10 -mb-10 p-6 px-10 rounded-b-[20px] border-t border-gray-100">
+              <button 
+                onClick={handlePrevious}
+                disabled={questionIndex === 0 || submitting}
+                className="btn-secondary flex items-center gap-2 disabled:opacity-30"
+              >
+                <ChevronLeft className="w-5 h-5" /> Previous
+              </button>
+              
+              <button 
+                onClick={handleNext}
+                disabled={submitting}
+                className="btn-primary min-w-[140px]"
+              >
+                {submitting ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    {questionIndex + 1 === questionData?.total ? "Finish" : "Next Question"}
+                    <ChevronRight className="w-5 h-5" />
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
-      </main>
+
+        {/* Side Panel: Info */}
+        <div className="space-y-6">
+          <div className="premium-card">
+            <h3 className="font-bold text-gray-900 mb-4">Interview Guidelines</h3>
+            <ul className="space-y-4">
+              <li className="flex gap-3 text-sm text-gray-500">
+                <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 font-bold text-[10px]">1</div>
+                Be as descriptive as possible in your technical explanations.
+              </li>
+              <li className="flex gap-3 text-sm text-gray-500">
+                <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 font-bold text-[10px]">2</div>
+                Focus on core concepts and best practices.
+              </li>
+              <li className="flex gap-3 text-sm text-gray-500">
+                <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 font-bold text-[10px]">3</div>
+                Answers are saved automatically as you move between questions.
+              </li>
+            </ul>
+          </div>
+
+          <div className="premium-card bg-gradient-to-br from-gray-900 to-slate-800 text-white border-none shadow-xl">
+            <h3 className="font-bold mb-2 flex items-center gap-2">
+              <AlertCircle className="text-yellow-400 w-4 h-4" />
+              Proctoring Status
+            </h3>
+            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+              Real-time monitoring is disabled for Phase 1. Complete this stage to unlock AI Surveillance.
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-[10px] uppercase font-bold tracking-widest text-slate-500">
+                <span>Phase Progress</span>
+                <span>25%</span>
+              </div>
+              <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 w-1/4"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

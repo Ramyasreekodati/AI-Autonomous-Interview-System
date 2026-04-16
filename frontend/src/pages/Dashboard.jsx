@@ -1,147 +1,254 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Trophy, FileText, CheckCircle, BarChart, Download } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { 
+  User, 
+  Mail, 
+  Briefcase, 
+  Code, 
+  BarChart, 
+  Play, 
+  ChevronRight,
+  ShieldCheck,
+  Settings
+} from 'lucide-react';
 
 const Dashboard = () => {
-    const navigate = useNavigate();
-    const { id: interviewId } = useParams();
-    const [results, setResults] = React.useState(null);
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    role: 'Software Engineer',
+    skills: ['Python'],
+    difficulty: 'Medium',
+    numQuestions: 5
+  });
 
-    React.useEffect(() => {
-        fetchResults();
-    }, []);
+  const roles = [
+    'Software Engineer',
+    'Data Scientist',
+    'Frontend Developer',
+    'ML Engineer',
+    'Backend Developer',
+    'Full Stack Developer'
+  ];
 
-    const fetchResults = async () => {
-        try {
-            const response = await axios.get(`http://localhost:8000/interview/${interviewId}/results`);
-            setResults(response.data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-    
-    if (!results) return <div className="p-20 text-center">Loading Analytics...</div>;
+  const skillOptions = [
+    'Python', 'React', 'SQL', 'Java', 'Machine Learning', 
+    'Deep Learning', 'FastAPI', 'Node.js', 'Docker', 'AWS'
+  ];
 
-    return (
-        <div className="min-h-screen bg-slate-50 p-8">
-            <div className="max-w-6xl mx-auto">
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
-                    <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <CheckCircle className="text-indigo-600 w-5 h-5" />
-                          <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Feedback Analysis</span>
-                        </div>
-                        <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Executive Report</h1>
-                        <p className="text-slate-500 font-medium mt-1">Interview session ID: {interviewId}</p>
-                    </div>
-                    <button className="btn-primary py-3 px-6 shadow-xl">
-                        <Download className="w-5 h-5" /> Export PDF Report
-                    </button>
-                </header>
+  const handleSkillToggle = (skill) => {
+    if (formData.skills.includes(skill)) {
+      setFormData({ ...formData, skills: formData.skills.filter(s => s !== skill) });
+    } else {
+      setFormData({ ...formData, skills: [...formData.skills, skill] });
+    }
+  };
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.95 }} 
-                      animate={{ opacity: 1, scale: 1 }} 
-                      className="premium-card flex flex-col items-center justify-center py-10"
+  const startInterview = async () => {
+    if (!formData.name || !formData.email) {
+      alert("Please fill in basic details.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await axios.post('http://localhost:8000/interview/start', {
+        candidate_name: formData.name,
+        candidate_email: formData.email,
+        role: formData.role,
+        skills: formData.skills,
+        difficulty: formData.difficulty,
+        num_questions: formData.numQuestions
+      });
+      navigate(`/interview/${response.data.interview_id}`);
+    } catch (error) {
+      console.error("Failed to start interview:", error);
+      alert("Error starting interview. Check if backend is running.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto px-4 py-8 animate-slide-up">
+      <div className="flex flex-col md:flex-row gap-8">
+        
+        {/* Left Panel: Configuration */}
+        <div className="w-full md:w-1/3 space-y-6">
+          <div className="premium-card">
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <Settings className="text-blue-500 w-5 h-5" />
+              Campaign Setup
+            </h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="input-label">Candidate Name</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
+                  <input 
+                    type="text" 
+                    className="input-field pl-10" 
+                    placeholder="Enter full name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="input-label">Work Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
+                  <input 
+                    type="email" 
+                    className="input-field pl-10" 
+                    placeholder="name@company.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="input-label">Target Role</label>
+                  <div className="relative">
+                    <Briefcase className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
+                    <select 
+                      className="input-field pl-10 appearance-none bg-white"
+                      value={formData.role}
+                      onChange={(e) => setFormData({...formData, role: e.target.value})}
                     >
-                         <div className="relative mb-6">
-                            <svg className="w-24 h-24 transform -rotate-90">
-                              <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
-                              <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray="251.2" strokeDashoffset={251.2 * (1 - results.interview_score / 100)} className="text-indigo-600" />
-                            </svg>
-                            <span className="absolute inset-0 flex items-center justify-center text-3xl font-black text-slate-900">{results.interview_score}</span>
-                         </div>
-                         <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Interview Score</p>
-                    </motion.div>
-                    
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.95 }} 
-                      animate={{ opacity: 1, scale: 1 }} 
-                      transition={{ delay: 0.1 }} 
-                      className="premium-card flex flex-col items-center justify-center py-10"
-                    >
-                         <div className="relative mb-6">
-                            <svg className="w-24 h-24 transform -rotate-90">
-                              <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
-                              <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray="251.2" strokeDashoffset={251.2 * (1 - results.behavior_score / 100)} className="text-emerald-500" />
-                            </svg>
-                            <span className="absolute inset-0 flex items-center justify-center text-3xl font-black text-slate-900">{results.behavior_score}</span>
-                         </div>
-                         <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Behavior Integrity</p>
-                    </motion.div>
-
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.95 }} 
-                      animate={{ opacity: 1, scale: 1 }} 
-                      transition={{ delay: 0.2 }} 
-                      className={`premium-card flex flex-col items-center justify-center py-10 border-l-4 ${results.risk_level === 'High' ? 'border-l-rose-500' : 'border-l-emerald-500'}`}
-                    >
-                         <div className="w-20 h-20 rounded-2xl bg-slate-50 flex items-center justify-center mb-6">
-                             {results.risk_level === 'High' ? <AlertCircle className="text-rose-500 w-10 h-10" /> : <CheckCircle className="text-emerald-500 w-10 h-10" />}
-                         </div>
-                         <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest mb-1">Risk Assessment</p>
-                         <p className={`text-sm font-black uppercase ${results.risk_level === 'High' ? 'text-rose-500' : 'text-emerald-500'}`}>{results.risk_level} Risk</p>
-                    </motion.div>
+                      {roles.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <section className="premium-card">
-                        <h3 className="text-lg font-extrabold text-slate-900 mb-8 flex items-center gap-3">
-                            <Trophy className="text-indigo-600 w-5 h-5" /> Qualitative Insights
-                        </h3>
-                        <div className="space-y-4">
-                            {[
-                                { name: "Technical Precision", value: "High", color: "badge-low" },
-                                { name: "Engagement Level", value: "Excellent", color: "badge-low" },
-                                { name: "Response Consistency", value: "Developing", color: "badge-medium" }
-                            ].map((item, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-4 bg-slate-50/50 border border-slate-100 rounded-xl">
-                                    <span className="text-sm font-semibold text-slate-700">{item.name}</span>
-                                    <span className={`badge ${item.color}`}>{item.value}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
+                <div>
+                  <label className="input-label">Difficulty Level</label>
+                  <div className="relative">
+                    <BarChart className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
+                    <select 
+                      className="input-field pl-10 appearance-none bg-white"
+                      value={formData.difficulty}
+                      onChange={(e) => setFormData({...formData, difficulty: e.target.value})}
+                    >
+                      <option value="Basic">Basic</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Advanced">Advanced</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
 
-                    <section className="premium-card">
-                        <h3 className="text-lg font-extrabold text-slate-900 mb-8 flex items-center gap-3">
-                            <BarChart className="text-indigo-600 w-5 h-5" /> Competency Breakdown
-                        </h3>
-                        <div className="space-y-8">
-                            {[
-                                { name: "Problem Solving", score: 85 },
-                                { name: "System Design", score: 60 }
-                            ].map((item, idx) => (
-                                <div key={idx}>
-                                    <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">
-                                        <span>{item.name}</span>
-                                        <span className="text-slate-900">{item.score}%</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                                        <motion.div 
-                                          initial={{ width: 0 }}
-                                          animate={{ width: `${item.score}%` }}
-                                          transition={{ duration: 1, delay: 0.5 }}
-                                          className="bg-indigo-600 h-full rounded-full" 
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="input-label mb-0">Questions Count</label>
+                  <span className="text-blue-600 font-bold text-sm bg-blue-50 px-2 py-0.5 rounded-full">{formData.numQuestions}</span>
                 </div>
-                
-                <div className="mt-16 text-center">
-                     <button onClick={() => navigate('/')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 transition-all uppercase tracking-widest">
-                        Return to Dashboard
-                     </button>
-                </div>
+                <input 
+                  type="range" 
+                  min="1" max="20" 
+                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  value={formData.numQuestions}
+                  onChange={(e) => setFormData({...formData, numQuestions: parseInt(e.target.value)})}
+                />
+              </div>
             </div>
+          </div>
+
+          <div className="premium-card">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Code className="w-4 h-4" /> Specializations
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {skillOptions.map(skill => (
+                <button
+                  key={skill}
+                  onClick={() => handleSkillToggle(skill)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                    formData.skills.includes(skill)
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-200 ring-2 ring-blue-100'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
+                  }`}
+                >
+                  {skill}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-    );
+
+        {/* Right Panel: Welcome / Preview */}
+        <div className="flex-1">
+          <div className="bg-white rounded-[32px] p-12 shadow-sm border border-gray-50 h-full flex flex-col justify-center items-center text-center relative overflow-hidden">
+             {/* Decorative Elements */}
+             <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50 rounded-full -mr-32 -mt-32 opacity-50 blur-3xl"></div>
+             <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-50 rounded-full -ml-32 -mb-32 opacity-50 blur-3xl"></div>
+
+            <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-3xl flex items-center justify-center mb-8 shadow-xl shadow-blue-100 animate-bounce-slow">
+              <Play className="text-white fill-current w-10 h-10 ml-1" />
+            </div>
+            
+            <h1 className="text-5xl font-black mb-6 tracking-tight leading-tight">
+              RecruitAI <span className="gradient-text">Autonomous</span>
+            </h1>
+            
+            <p className="text-gray-500 max-w-lg mb-12 text-lg leading-relaxed">
+              Launch a high-integrity, AI-driven assessment tailored 
+              precisely to your role's technical requirements. 
+              Zero bias, full transparency.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md mb-12">
+               <div className="flex-1 p-5 bg-gray-50/50 backdrop-blur-sm rounded-2xl border border-gray-100 text-left">
+                  <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Status</div>
+                  <div className="flex items-center gap-2 font-bold text-green-600">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    System Online
+                  </div>
+               </div>
+               <div className="flex-1 p-5 bg-gray-50/50 backdrop-blur-sm rounded-2xl border border-gray-100 text-left">
+                  <div className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Phase</div>
+                  <div className="font-bold text-gray-700">1.0 Core System</div>
+               </div>
+            </div>
+
+            <button 
+              onClick={startInterview}
+              disabled={loading}
+              className="btn-primary w-full max-w-xs py-5 text-xl rounded-2xl group relative overflow-hidden"
+            >
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                {loading ? "Preparing Session..." : (
+                  <>
+                    Begin Evaluation
+                    <ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-700 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            </button>
+            
+            <div className="mt-8 flex items-center gap-6 text-gray-400">
+               <div className="flex items-center gap-1.5 text-xs font-medium">
+                 <ShieldCheck className="w-4 h-4 text-blue-400" />
+                 Secure Storage
+               </div>
+               <div className="w-1 h-1 bg-gray-200 rounded-full"></div>
+               <div className="flex items-center gap-1.5 text-xs font-medium">
+                 <BarChart className="w-4 h-4 text-purple-400" />
+                 Dynamic Scaling
+               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default Dashboard;
