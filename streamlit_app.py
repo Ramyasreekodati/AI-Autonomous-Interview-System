@@ -282,14 +282,21 @@ with st.sidebar:
         c_name = st.text_input("Full Name", key="p5_name")
         c_role = st.text_input("Target Role", "Senior Engineer", key="p5_role")
         
-        # 🎯 USER-DEFINED COMPETENCY ENGINE (ELITE UPGRADE)
-        c_skills_raw = st.text_input(
-            "Core Competencies", 
-            placeholder="e.g. Python, AWS, System Design, React",
-            help="Type your skills separated by commas."
+        # 🎯 HYBRID COMPETENCY ENGINE (ELITE UPGRADE)
+        default_skills = ["Python", "React", "AWS", "SQL", "ML", "System Design", "FastAPI", "Docker"]
+        selected_skills = st.multiselect(
+            "Core Competencies (Dropdown)",
+            options=default_skills,
+            default=["Python"]
         )
-        c_skills = [s.strip() for s in c_skills_raw.split(",")] if c_skills_raw else []
-        st.caption("AI will build the interview room around the skills you type above.")
+        custom_skills = st.text_input(
+            "➕ Add Custom Skills (Comma Separated)",
+            placeholder="e.g. Kubernetes, Terraform, Rust"
+        )
+        custom_list = [s.strip() for s in custom_skills.split(",") if s.strip()]
+        c_skills = list(set(selected_skills + custom_list))
+        
+        st.caption("Fusing guided pool and custom technical injection.")
         
         c_exp = st.selectbox("Experience Level", ["Fresher", "1-3 years", "3-5 years", "5+ years"], key="p5_exp")
         c_type = st.selectbox("Interview Type", ["Technical", "HR", "System Design", "Mixed"], key="p5_type")
@@ -298,9 +305,17 @@ with st.sidebar:
         c_count = st.number_input("Question Count", 1, 10, 3, key="p5_count")
         
         if st.button("🚀 INITIALIZE PRODUCTION AUDIT", use_container_width=True):
-            if c_name and c_skills:
-                InterviewController.initialize_session(c_name, c_role, c_skills, c_diff, c_count, c_exp, c_type, c_style)
+            if not c_name:
+                st.error("⚠️ Candidate Name is required.")
+            elif not c_skills:
+                st.error("⚠️ Please select or type at least one competency.")
+            else:
+                InterviewController.initialize_session(
+                    c_name, c_role, c_skills, c_diff, c_count, c_exp, c_type, c_style
+                )
                 st.rerun()
+        
+        st.info("🧠 **Audit Logic:** Think carefully before answering. This simulates a high-stakes professional interview.")
     else:
         st.markdown("#### 📡 LIVE SIGNAL TRACE")
         st.write(f"**Auditing:** {st.session_state.candidate_info.get('name')}")
