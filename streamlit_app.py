@@ -310,6 +310,11 @@ elif st.session_state.app_state == "INTERVIEW":
         q_text = st.session_state.questions[idx]
         st.markdown(f"<div class='card'><b>AUDIT QUESTION {idx+1}:</b><br>{q_text}</div>", unsafe_allow_html=True)
         
+        # Follow-up Injection (Elite Room Feature)
+        fu_key = f"fu_{idx}"
+        if fu_key in st.session_state:
+            st.markdown(f"<div style='margin-left:20px; border-left:3px solid #7C3AED; padding-left:15px; color:#A78BFA;'><b>AI FOLLOW-UP:</b><br><i>{st.session_state[fu_key]}</i></div>", unsafe_allow_html=True)
+
         existing_ans = st.session_state.answers.get(idx, {}).get("answer", "")
         
         if st.session_state.get("stt_active"):
@@ -318,11 +323,20 @@ elif st.session_state.app_state == "INTERVIEW":
         else:
             ans = st.text_area("Technical Response", height=250, key=f"ans_{idx}", value=existing_ans)
 
-        col_p, col_n = st.columns([1, 2])
+        col_p, col_n, col_f = st.columns([1, 1, 2])
         if idx > 0 and col_p.button("← PREVIOUS"):
             st.session_state.q_idx -= 1
             st.rerun()
             
+        if col_f.button("🔍 PROBE DEEPER (FOLLOW-UP)", use_container_width=True):
+            if ans.strip():
+                with st.spinner("AI is analyzing for follow-up..."):
+                    follow_up = ai_engine.generate_follow_up(q_text, ans)
+                    st.session_state[fu_key] = follow_up
+                    st.rerun()
+            else:
+                st.warning("Please provide an answer first to generate a follow-up.")
+
         if col_n.button("COMMIT & CONTINUE →", use_container_width=True):
             if InterviewController.commit_answer(idx, q_text, ans):
                 st.session_state.last_submit_time = time.time()
