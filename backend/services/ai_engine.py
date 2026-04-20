@@ -61,118 +61,163 @@ class AIEngine:
                     clean_questions.append(q)
                 
                 if clean_questions:
-                    return clean_questions[:count]
-            except Exception:
-                if attempt == max_retries - 1:
-                    return (fallback_questions * 2)[:count] # Ensure correct count
-                time.sleep(1) # Wait before retry
+        # API Key Retrieval (Streamlit Secrets -> Environment)
+        api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            # Fallback for local dev if needed, but production MUST have it
+            api_key = os.getenv("GEMINI_API_KEY")
         
-        return (fallback_questions * 2)[:count]
+        if not api_key:
+            st.error("Missing Gemini API Key. Please configure GEMINI_API_KEY in Streamlit Secrets.")
+            st.stop()
+        
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
+
+    @st.cache_data
+    def generate_questions_cached(_self, role, skills, difficulty, count):
+        """
+        MASTER PROMPT 1: QUESTION GENERATION (PHASE 1)
+        """
+        try:
+            prompt = f"""
+            You are a senior technical interviewer.
+            Generate high-quality interview questions.
+
+            INPUT:
+            Role: {role}
+            Skills: {skills}
+            Difficulty: {difficulty}
+            Number of questions: {count}
+
+            RULES:
+            - Questions must be realistic and industry-level
+            - Mix conceptual and practical questions
+            - Avoid generic questions
+            - Do NOT repeat
+            - Keep questions clear and concise
+
+            OUTPUT:
+            Return ONLY a numbered list of questions.
+            """
+            
+            response = _self.model.generate_content(prompt)
+            lines = [l.split('.', 1)[-1].strip() for l in response.text.strip().split('\n') if l.strip() and '.' in l]
+            
+            # BIAS AUDIT (REGEX LAYER)
+            questions = [q for q in lines if not re.search(r'\b(he|she|him|her|his|hers)\b', q, re.I)]
+            
+            if not questions:
+                return [f"Explain your approach to {skills[0]} at a {difficulty} level."]
+            return questions[:count]
+        except Exception:
+            return [f"What are the core principles of {skills[0]} in a production environment?"]
 
     def evaluate_answer(self, question, answer):
         """
-        UPGRADED PHASE 2: Controlled AI Evaluation with deterministic guards.
+        MASTER PROMPT 2: EVALUATION ENGINE (PHASE 2 - STRICT)
         """
         clean_answer = answer.strip()
         
-        # 1. DETERMINISTIC PRE-VALIDATION (Rule-Based)
+        # DETERMINISTIC GUARD (PHASE 2 REQUIREMENT)
         if not clean_answer or len(clean_answer) < 5 or re.match(r'^[a-zA-Z0-9\s]{1,5}$', clean_answer):
             return {
-                "score": 0.0,
-                "keywords_matched": [],
-                "missing_concepts": ["Valid technical explanation required"],
-                "strengths": [],
+                "score": 0.0, 
+                "keywords_matched": [], 
+                "missing_concepts": ["Valid technical answer required"],
+                "strengths": [], 
                 "weaknesses": ["Invalid or insufficient answer"]
             }
 
-        # 2. CONTROLLED GEMINI LAYER (Ultra-Strong Prompt)
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                # ULTRA-STRONG PROMPT IMPLEMENTED
-                prompt = f"""
-                You are a STRICT TECHNICAL INTERVIEW EVALUATOR.
-                You MUST evaluate the candidate's answer based ONLY on the given question and answer.
+        prompt = f"""
+        You are a STRICT TECHNICAL INTERVIEW EVALUATOR.
+        You MUST evaluate ONLY based on the given answer.
 
-                🚨 STRICT RULES
-                - DO NOT assume anything outside the answer
-                - DO NOT add extra knowledge
-                - DO NOT hallucinate
-                - DO NOT include any text outside JSON
-                
-                🎯 TASK
-                Question: {question}
-                Answer: {clean_answer}
+        INPUT
+        Question: {question}
+        Answer: {clean_answer}
 
-                📊 OUTPUT FORMAT (STRICT JSON ONLY)
-                {{
-                "score": number (0-10),
-                "keywords_matched": [list of words found in answer],
-                "missing_concepts": [important concepts not present],
-                "strengths": [based ONLY on answer],
-                "weaknesses": [based ONLY on answer]
-                }}
+        STRICT RULES:
+        - DO NOT assume anything beyond the answer
+        - DO NOT hallucinate
+        - DO NOT add external knowledge
+        - DO NOT output anything outside JSON
+        
+        OUTPUT FORMAT (STRICT JSON):
+        {{
+        "score": 0-10,
+        "keywords_matched": [],
+        "missing_concepts": [],
+        "strengths": [],
+        "weaknesses": []
+        }}
 
-                ⚠️ VALIDATION RULES
-                If answer is empty OR meaningless: score = 0, weaknesses = ["Invalid or insufficient answer"]
-                keywords_matched MUST come ONLY from answer text.
-                Return ONLY VALID JSON.
-                """
-                
-                response = self.model.generate_content(prompt)
-                
-                # 3. JSON EXTRACTION (Regex Guard)
-                json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
-                if json_match:
-                    try:
-                        eval_data = json.loads(json_match.group())
-                        
-                        # 4. STRUCTURAL VALIDATION (Schema Guard)
-                        required = ["score", "keywords_matched", "missing_concepts", "strengths", "weaknesses"]
-                        if all(k in eval_data for k in required):
-                            # Ensure deterministic types
-                            return {
-                                "score": float(eval_data["score"]),
-                                "keywords_matched": list(eval_data["keywords_matched"]),
-                                "missing_concepts": list(eval_data["missing_concepts"]),
-                                "strengths": list(eval_data["strengths"]),
-                                "weaknesses": list(eval_data["weaknesses"])
-                            }
-                    except (json.JSONDecodeError, ValueError):
-                        pass # try again
-            except Exception:
-                if attempt < max_retries - 1:
-                    time.sleep(1)
-                    continue
-
-        # 5. DETERMINISTIC FALLBACK ENGINE (Failure Guard)
-        fallback_score = 1.0 if len(clean_answer) > 20 else 0.0
+        VALIDATION RULES:
+        If answer is empty or meaningless: score = 0, weaknesses = ["Invalid or insufficient answer"]
+        keywords_matched MUST come from answer.
+        RETURN ONLY VALID JSON.
+        """
+        
+        try:
+            response = self.model.generate_content(prompt)
+            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            if json_match:
+                eval_data = json.loads(json_match.group())
+                # Ensure all 5 keys exist
+                required = ["score", "keywords_matched", "missing_concepts", "strengths", "weaknesses"]
+                if all(k in eval_data for k in required):
+                    return eval_data
+        except Exception:
+            pass
+        
+        # DETERMINISTIC FALLBACK
         return {
-            "score": fallback_score,
-            "keywords_matched": [],
-            "missing_concepts": ["Deep technical audit could not be performed"],
-            "strengths": ["Length is sufficient" if len(clean_answer) > 20 else "Direct response"],
-            "weaknesses": ["Automated system fallback triggered"]
+            "score": 1.0 if len(clean_answer) > 20 else 0.0, 
+            "keywords_matched": [], 
+            "missing_concepts": ["Audit Failure"], 
+            "strengths": [], 
+            "weaknesses": ["System Fallback Mode Active"]
         }
+
+    def generate_follow_up(self, question, answer):
+        """
+        MASTER PROMPT 3: FOLLOW-UP QUESTION (PHASE 5 - UX BOOST)
+        """
+        try:
+            prompt = f"""
+            You are an AI interviewer continuing a live interview.
+            Based on the candidate’s previous answer, generate ONE follow-up question.
+
+            INPUT:
+            Question: {question}
+            Answer: {answer}
+
+            RULES:
+            - Ask a deeper or clarifying question
+            - Keep it relevant to the answer
+            - Do NOT repeat the same question
+            - Keep it short and professional
+
+            OUTPUT:
+            Return ONLY one question.
+            """
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+        except Exception:
+            return "Can you elaborate more on the technical challenges mentioned in your answer?"
 
     @staticmethod
     def generate_final_result(evaluations, alerts):
         """
-        DETERMINISTIC PHASE 4 INTEGRATION ENGINE
-        Fuses technical merit (Phase 2) and proctoring signals (Phase 3).
+        PHASE 4: DETERMINISTIC SYNTHESIS (RULE-BASED)
+        Fuses merit (Phase 2) and integrity (Phase 3).
         """
-        # 1. INTERVIEW SCORE (Avg of Phase 2 Scores)
         if not evaluations:
             avg_tech = 0.0
         else:
             tech_scores = [float(ev.get('score', 0)) for ev in evaluations.values() if isinstance(ev, dict)]
-            if not tech_scores:
-                avg_tech = 0.0
-            else:
-                # Convert 0-10 scale to 0-100 scale
-                avg_tech = round((sum(tech_scores) / (len(tech_scores) * 10)) * 100, 1)
-
-        # 2. BEHAVIOR SCORE (Strict Weights: High -30, Medium -15, Low -5)
+            avg_tech = round((sum(tech_scores) / (len(tech_scores) * 10)) * 100, 1) if tech_scores else 0.0
+        
         behavior = 100
         for a in alerts:
             sev = a.get('severity', 'low').lower()
@@ -180,32 +225,24 @@ class AIEngine:
             elif sev == "medium": behavior -= 15
             else: behavior -= 5
         behavior = max(0, behavior)
-
-        # 3. RISK ANALYSIS (Strict Thresholds: HIGH < 40, MEDIUM 40-70, LOW > 70)
+        
         risk = "HIGH" if behavior < 40 else "MEDIUM" if behavior <= 70 else "LOW"
-
-        # 4. FINAL DECISION ENGINE (Rule-Based Matrix)
+        
+        # Decision Matrix
         if avg_tech >= 80 and risk == "LOW":
             decision = "SELECTED"
         elif avg_tech < 50 or risk == "HIGH":
             decision = "REJECTED"
         else:
             decision = "REVIEW"
-
-        # 5. DETERMINISTIC JUSTIFICATION (No AI Hallucination)
-        justification = (
-            f"Candidate achieved a merit score of {avg_tech}% with a {risk.lower()} behavioral risk level. "
-            f"System recorded {len(alerts)} proctoring signals during the audit."
-        )
-
-        # 6. STRICT JSON OUTPUT (No extra keys)
+        
         return {
-            "interview_score": avg_tech,
-            "behavior_score": behavior,
+            "interview_score": avg_tech, 
+            "behavior_score": behavior, 
             "risk_level": risk,
-            "alerts": alerts,
-            "final_decision": decision,
-            "justification": justification
+            "alerts": alerts, 
+            "final_decision": decision, 
+            "justification": f"Candidate merit evaluated at {avg_tech}% with a {risk.lower()} behavioral risk profile."
         }
 
 ai_engine = AIEngine()
