@@ -44,24 +44,40 @@ class AIEngine:
         """
         try:
             prompt = f"""
-            You are a senior {role} interviewer with {experience} of experience.
-            Generate high-quality {interview_type} interview questions.
+            You are a senior technical interviewer conducting a real interview.
 
-            INPUT PARAMETERS:
+            Generate high-quality interview questions based on the candidate profile.
+
+            CANDIDATE PROFILE
             - Role: {role}
-            - Core Skills: {', '.join(skills)}
+            - Skills: {', '.join(skills)}
             - Experience Level: {experience}
             - Interview Level: {difficulty}
             - Interview Type: {interview_type}
             - Question Style: {style}
-            - Count: {count}
+            - Number of Questions: {count}
 
-            CORE INSTRUCTIONS:
-            - Questions must be realistic, highly technical, and industry-standard.
-            - Focus on {style} for {experience} candidates.
-            - Avoid generic or repetitive questions.
-            - Challenge the candidate based on the {difficulty} setting.
-            - Ensure questions are practical and map to real-world scenarios.
+            INSTRUCTIONS:
+            1. Questions must match the candidate's experience level ({experience}).
+            2. Questions must focus on listed skills ({', '.join(skills)}).
+            3. Adjust difficulty based on interview level ({difficulty}).
+            4. Follow interview type:
+               - Technical -> deep technical questions
+               - HR -> behavioral questions
+               - System Design -> architecture questions
+               - Mixed -> combination
+            5. Follow question style:
+               - Conceptual -> theory-based
+               - Scenario-Based -> real-world problems
+               - Coding -> problem-solving
+               - Mixed -> combination
+
+            RULES:
+            - Do NOT generate generic questions.
+            - Do NOT repeat questions.
+            - Make questions realistic (like real interviews).
+            - Keep questions clear and concise.
+            - Avoid unnecessary explanations.
 
             OUTPUT:
             Return ONLY a numbered list of questions.
