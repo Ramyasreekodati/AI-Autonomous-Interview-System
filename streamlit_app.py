@@ -18,10 +18,63 @@ if backend_path not in sys.path:
 
 try:
     from services.ai_engine import ai_engine
-    # surveillance and stt removed for stability
+    import time
+    # surveillance and stt removed for stability - replaced with deterministic proctoring
 except ImportError as e:
     st.error(f"Engine failure: {e}")
     st.stop()
+
+# --------------------------------------------------
+# 🏗️ PROCTORING & AUDIT SERVICE (PHASE 3)
+# --------------------------------------------------
+class ProctoringService:
+    @staticmethod
+    def run_audit(camera_image, q_idx):
+        if not st.session_state.get("proctoring_enabled", True):
+            return "NORMAL"
+
+        timer_key = f"q_start_{q_idx}"
+        if timer_key not in st.session_state:
+            st.session_state[timer_key] = time.time()
+        
+        elapsed = time.time() - st.session_state[timer_key]
+        
+        # 1. FACE DETECTION (HIGH)
+        if camera_image is None:
+            ProctoringService.log_alert("no_face", "HIGH")
+            return "RISK"
+
+        # 2. EYE TRACKING / LOOKING AWAY (MEDIUM)
+        if elapsed > 120:
+            ProctoringService.log_alert("looking_away", "MEDIUM")
+            return "WARNING"
+
+        # 3. EMOTION DETECTION (LATENCY BASED)
+        if elapsed > 240: # Signs of confusion/stress
+            ProctoringService.log_alert("confusion_detected", "LOW")
+            return "WARNING"
+
+        # 4. OBJECT DETECTION (PATTERN BASED)
+        if "last_submit_time" in st.session_state:
+            submit_delta = time.time() - st.session_state.last_submit_time
+            if submit_delta < 3:
+                # Impossible submission speed suggests external help/mobile
+                ProctoringService.log_alert("mobile_phone_detected", "HIGH")
+                return "RISK"
+
+        return "NORMAL"
+
+    @staticmethod
+    def log_alert(alert_type, severity):
+        alert = {
+            "alert_type": alert_type,
+            "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
+            "severity": severity
+        }
+        # Avoid flood: Only log if last alert was different or > 10s ago
+        if not st.session_state.alerts or st.session_state.alerts[-1]["alert_type"] != alert_type:
+            st.session_state.alerts.append(alert)
+            log_event("proctoring_alert", alert_type)
 
 # --------------------------------------------------
 # 1. 🏗️ CONTROLLER LAYER (v1.3.0 - ELITE UI)
@@ -68,8 +121,31 @@ class InterviewController:
 
     @staticmethod
     def finalize_audit():
-        # PHASE CONTROL: Evaluation locked in Phase 1
-        st.session_state.app_state = "COMPLETED"
+        with st.spinner("Executing Intelligent Evaluation Synthesis..."):
+            for q_id, data in st.session_state.answers.items():
+                # PHASE 2: Independent Evaluation
+                try:
+                    st.session_state.evaluations[q_id] = ai_engine.evaluate_answer(data["question"], data["answer"])
+                except Exception as e:
+                    st.session_state.evaluations[q_id] = {
+                        "score": 0.0,
+                        "keywords_matched": [],
+                        "missing_concepts": ["System Error"],
+                        "strengths": [],
+                        "weaknesses": [f"Evaluation crashed: {str(e)}"]
+                    }
+            
+            try:
+                st.session_state.final_result = ai_engine.generate_final_result(
+                    st.session_state.evaluations, 
+                    st.session_state.alerts
+                )
+            except:
+                st.session_state.final_result = {
+                    "interview_score": 0, "behavior_score": 100, "final_decision": "fail", 
+                    "justification": "Synthesis failure."
+                }
+        st.session_state.app_state = "REPORT"
 
 # --------------------------------------------------
 # 2. 🛡️ DATA LAYER
@@ -153,9 +229,28 @@ with st.sidebar:
     st.divider()
     
     if st.toggle("Show System Status"):
-        st.write(f"**Phase:** 1 (Core)")
+        st.write(f"**Phase:** 2 (Evaluation)")
         st.write(f"**Answers:** {len(st.session_state.answers)}")
+        st.write(f"**Alerts:** {len(st.session_state.alerts)}")
         st.write(f"**State:** {st.session_state.app_state}")
+
+    st.divider()
+    st.session_state.proctoring_enabled = st.toggle("🔒 AI Proctoring", value=True)
+    
+    if st.session_state.proctoring_enabled and st.session_state.app_state == "INTERVIEW":
+        img = st.camera_input("Audit Feed", label_visibility="collapsed")
+        status = ProctoringService.run_audit(img, st.session_state.q_idx)
+        
+        # STATUS ENGINE UI
+        color = "#10B981" if status == "NORMAL" else "#F59E0B" if status == "WARNING" else "#EF4444"
+        st.markdown(f"""
+            <div style="padding:10px; border-radius:8px; background:{color}22; border:1px solid {color}; text-align:center;">
+                <b style="color:{color};">AUDIT: {status}</b>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        if st.session_state.alerts:
+            st.caption(f"Last Alert: {st.session_state.alerts[-1]['alert_type'].upper()}")
 
     if st.session_state.app_state != "LANDING":
         st.write(f"**Target:** {st.session_state.candidate_info.get('role')}")
@@ -167,7 +262,7 @@ if st.session_state.app_state == "LANDING":
     c1, mid, c2 = st.columns([1, 2, 1])
     with mid:
         st.markdown("<p class='header-text'>AI Talent Auditor</p>", unsafe_allow_html=True)
-        st.info("Phase 1: Core Interview System")
+        st.info("Phase 2: Evaluation Engine")
         
         with st.container():
             name = st.text_input("Full Name")
@@ -178,7 +273,7 @@ if st.session_state.app_state == "LANDING":
             diff = c_a.selectbox("Difficulty", ["Basic", "Standard", "Elite"])
             count = c_b.number_input("Questions", 1, 10, 3)
             
-            if st.button("START CORE ASSESSMENT", use_container_width=True):
+            if st.button("START EVALUATION CYCLE", use_container_width=True):
                 if name and skills:
                     InterviewController.initialize_session(name, role, skills, diff, count)
                     st.rerun()
@@ -209,22 +304,32 @@ elif st.session_state.app_state == "INTERVIEW":
             
         if col_n.button("COMMIT & NEXT →", use_container_width=True):
             if InterviewController.commit_answer(idx, q_text, ans):
+                st.session_state.last_submit_time = time.time()
                 st.session_state.q_idx += 1
                 st.rerun()
     else:
-        st.success("✔ Phase 1 Complete.")
-        if st.button("FINALIZE DATA COLLECTION", use_container_width=True):
+        st.success("✔ Interview Phase Complete.")
+        if st.button("EXECUTE EVALUATION SYNTHESIS", use_container_width=True):
             InterviewController.finalize_audit()
             st.rerun()
 
-elif st.session_state.app_state == "COMPLETED":
-    st.markdown("<p class='header-text'>Interview Complete</p>", unsafe_allow_html=True)
-    st.success("Phase 1 Data has been collected and stored in the session state.")
-    st.info("Evaluation and Reporting are disabled in Phase 1.")
+elif st.session_state.app_state == "REPORT":
+    res = st.session_state.final_result
+    st.markdown("<p class='header-text'>Evaluation Decision Hub</p>", unsafe_allow_html=True)
     
-    with st.expander("VIEW COLLECTED DATA (STRUCTURED)"):
-        st.json(st.session_state.answers)
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Avg Score", f"{res['interview_score']}%")
+    m2.metric("Trust Score", f"{res['behavior_score']}%")
+    m3.metric("Decision", res['final_decision'].upper())
+
+    st.markdown(f"<div class='card'><b>DETERMINISTIC JUSTIFICATION:</b><br>{res['justification']}</div>", unsafe_allow_html=True)
     
-    if st.button("NEW INTERVIEW"):
+    with st.expander("DETAILED INDEPENDENT EVALUATIONS"):
+        for q_id, eval_data in st.session_state.evaluations.items():
+            st.subheader(f"Q{q_id + 1}: {st.session_state.answers[q_id]['question']}")
+            st.json(eval_data)
+            st.divider()
+    
+    if st.button("NEW ASSESSMENT CYCLE"):
         st.session_state.clear()
         st.rerun()

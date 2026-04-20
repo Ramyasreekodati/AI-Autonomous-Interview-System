@@ -71,52 +71,89 @@ class AIEngine:
 
     def evaluate_answer(self, question, answer):
         """
-        GEMINI POWERED: Sophisticated technical evaluation with robust JSON parsing and retries.
+        UPGRADED PHASE 2: Controlled AI Evaluation with deterministic guards.
         """
-        default_response = {
-            "score": 5.0,
-            "keywords_matched": ["General Knowledge"],
-            "strengths": ["Communicated response"],
-            "weaknesses": ["System fallback triggered"],
-            "missing_concepts": ["API Detail"],
-            "passed_validation": True
-        }
+        clean_answer = answer.strip()
         
-        max_retries = 2
+        # 1. DETERMINISTIC PRE-VALIDATION (Rule-Based)
+        if not clean_answer or len(clean_answer) < 5 or re.match(r'^[a-zA-Z0-9\s]{1,5}$', clean_answer):
+            return {
+                "score": 0.0,
+                "keywords_matched": [],
+                "missing_concepts": ["Valid technical explanation required"],
+                "strengths": [],
+                "weaknesses": ["Invalid or insufficient answer"]
+            }
+
+        # 2. CONTROLLED GEMINI LAYER (Ultra-Strong Prompt)
+        max_retries = 3
         for attempt in range(max_retries):
             try:
+                # ULTRA-STRONG PROMPT IMPLEMENTED
                 prompt = f"""
-                As a Senior Technical Auditor, evaluate this interview response:
-                Question: {question}
-                Candidate Answer: {answer}
+                You are a STRICT TECHNICAL INTERVIEW EVALUATOR.
+                You MUST evaluate the candidate's answer based ONLY on the given question and answer.
 
-                Provide a JSON response with exactly these fields:
-                - score: (float between 0 and 10)
-                - keywords_matched: (list of strings)
-                - strengths: (list of strings)
-                - weaknesses: (list of strings)
-                - missing_concepts: (list of strings)
-                - passed_validation: (boolean)
+                🚨 STRICT RULES
+                - DO NOT assume anything outside the answer
+                - DO NOT add extra knowledge
+                - DO NOT hallucinate
+                - DO NOT include any text outside JSON
                 
-                Return ONLY the JSON.
+                🎯 TASK
+                Question: {question}
+                Answer: {clean_answer}
+
+                📊 OUTPUT FORMAT (STRICT JSON ONLY)
+                {{
+                "score": number (0-10),
+                "keywords_matched": [list of words found in answer],
+                "missing_concepts": [important concepts not present],
+                "strengths": [based ONLY on answer],
+                "weaknesses": [based ONLY on answer]
+                }}
+
+                ⚠️ VALIDATION RULES
+                If answer is empty OR meaningless: score = 0, weaknesses = ["Invalid or insufficient answer"]
+                keywords_matched MUST come ONLY from answer text.
+                Return ONLY VALID JSON.
                 """
                 
                 response = self.model.generate_content(prompt)
                 
-                # Improved JSON extraction
+                # 3. JSON EXTRACTION (Regex Guard)
                 json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
                 if json_match:
                     try:
-                        return json.loads(json_match.group())
-                    except json.JSONDecodeError:
+                        eval_data = json.loads(json_match.group())
+                        
+                        # 4. STRUCTURAL VALIDATION (Schema Guard)
+                        required = ["score", "keywords_matched", "missing_concepts", "strengths", "weaknesses"]
+                        if all(k in eval_data for k in required):
+                            # Ensure deterministic types
+                            return {
+                                "score": float(eval_data["score"]),
+                                "keywords_matched": list(eval_data["keywords_matched"]),
+                                "missing_concepts": list(eval_data["missing_concepts"]),
+                                "strengths": list(eval_data["strengths"]),
+                                "weaknesses": list(eval_data["weaknesses"])
+                            }
+                    except (json.JSONDecodeError, ValueError):
                         pass # try again
-                
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    return default_response
-                time.sleep(1)
-        
-        return default_response
+            except Exception:
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                    continue
+
+        # 5. DETERMINISTIC FALLBACK ENGINE (Failure Guard)
+        fallback_score = 1.0 if len(clean_answer) > 20 else 0.0
+        return {
+            "score": fallback_score,
+            "keywords_matched": [],
+            "missing_concepts": ["Deep technical audit could not be performed"],
+            "strengths": ["Length is sufficient" if len(clean_answer) > 20 else "Direct response"],
+            "weaknesses": ["Automated system fallback triggered"]
+        }
 
     @staticmethod
     def generate_final_result(evaluations, alerts):
