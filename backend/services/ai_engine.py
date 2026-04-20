@@ -19,7 +19,8 @@ class AIEngine:
             st.stop()
         
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash-native-audio-latest')
+        # 🛡️ PRODUCTION STABLE MODEL
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
 
     def transcribe_audio(self, audio_bytes):
         """
@@ -84,16 +85,17 @@ class AIEngine:
             """
             
             response = _self.model.generate_content(prompt)
-            lines = [l.split('.', 1)[-1].strip() for l in response.text.strip().split('\n') if l.strip() and '.' in l]
+            # ROBUST EXTRACTION: Handle various numbering formats (1., 1), 1:)
+            lines = [re.sub(r'^\d+[\.\)\:]\s*', '', l).strip() for l in response.text.strip().split('\n') if l.strip()]
             
             # BIAS AUDIT (REGEX LAYER)
             questions = [q for q in lines if not re.search(r'\b(he|she|him|her|his|hers)\b', q, re.I)]
             
             if not questions:
-                return [f"As a {experience} professional, how do you handle {skills[0]} at scale?"]
-            return questions[:count]
+                return [f"As a {experience} professional, how do you handle {skills[0]} at scale?"] * count
+            return (questions * ((count // len(questions)) + 1))[:count]
         except Exception:
-            return [f"Explain your approach to {skills[0]} in a high-concurrency {role} role."]
+            return [f"Explain your approach to {skills[0]} in a high-concurrency {role} role."] * count
 
     def evaluate_answer(self, question, answer):
         """

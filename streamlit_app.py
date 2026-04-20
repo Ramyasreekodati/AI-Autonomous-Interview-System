@@ -171,11 +171,12 @@ class InterviewController:
         try:
             pdf = FPDF()
             pdf.add_page()
-            pdf.set_font("Arial", 'B', 16)
-            pdf.cell(200, 10, "AUDIT REPORT - RECRUITAI ELITE v1.2.5", ln=True, align='C')
+            pdf.set_font("helvetica", 'B', 16)
+            pdf.cell(200, 10, "AUDIT REPORT - RECRUITAI ELITE v1.3.0", ln=True, align='C')
             pdf.ln(10)
-            pdf.set_font("Arial", size=12)
-            pdf.cell(200, 10, f"Candidate: {st.session_state.candidate_info.get('name', 'N/A')}", ln=True)
+            pdf.set_font("helvetica", size=12)
+            name = st.session_state.candidate_info.get('name') if st.session_state.candidate_info else "N/A"
+            pdf.cell(200, 10, f"Candidate: {name}", ln=True)
             pdf.cell(200, 10, f"Session: {st.session_state.session_id}", ln=True)
             pdf.ln(5)
             pdf.cell(200, 10, f"Final Decision: {res['final_decision']}", ln=True)
