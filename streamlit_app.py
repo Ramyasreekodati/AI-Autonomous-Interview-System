@@ -154,15 +154,20 @@ with st.sidebar:
     st.markdown("### 💎 RECRUITAI **ELITE**")
     st.caption(f"Audit Session: #{st.session_state.session_id}")
     st.divider()
+    
+    # DEBUG MODE (Hidden by default, toggleable)
+    if st.toggle("Show System Status"):
+        st.write(f"**State:** {st.session_state.app_state}")
+        st.write(f"**Questions Loaded:** {len(st.session_state.questions)}")
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+        key_status = "✅ ACTIVE" if GEMINI_API_KEY else "❌ MISSING"
+        st.write(f"**Gemini API:** {key_status}")
+
     if st.session_state.app_state != "LANDING":
         st.write(f"**Target:** {st.session_state.candidate_info.get('role')}")
         if st.button("RESET AUDIT"):
             st.session_state.clear()
             st.rerun()
-
-    # CHECK FOR API KEY
-    if not os.getenv("GEMINI_API_KEY"):
-        st.warning("⚠️ GEMINI_API_KEY not found in environment. Please set it in Streamlit Secrets.")
 
 if st.session_state.app_state == "LANDING":
     c1, mid, c2 = st.columns([1, 2, 1])
@@ -187,6 +192,15 @@ if st.session_state.app_state == "LANDING":
 
 elif st.session_state.app_state == "INTERVIEW":
     idx = st.session_state.q_idx
+    
+    # 🛡️ DEFENSIVE CHECK: Ensure we have questions before rendering
+    if not st.session_state.questions:
+        st.error("No questions were generated. Please reset and try again.")
+        if st.button("RETRY GENERATION"):
+            st.session_state.clear()
+            st.rerun()
+        st.stop()
+
     if idx < len(st.session_state.questions):
         st.progress((idx + 1) / len(st.session_state.questions))
         

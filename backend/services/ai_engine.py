@@ -8,9 +8,9 @@ import google.generativeai as genai
 import os
 
 # Configure Gemini
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+# Prioritize Streamlit Secrets, then environment variables
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY") or "AIzaSyBVYhalb3qz0gofxe0VvUlZCARNUh9DSMM"
+genai.configure(api_key=GEMINI_API_KEY)
 
 class AIEngine:
     def __init__(self):
