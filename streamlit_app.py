@@ -274,28 +274,14 @@ with st.sidebar:
         c_name = st.text_input("Full Name", key="p5_name")
         c_role = st.text_input("Target Role", "Senior Engineer", key="p5_role")
         
-        # 🎯 DYNAMIC COMPETENCY ENGINE (PHASE 5 UPGRADE)
-        if "available_skills" not in st.session_state:
-            st.session_state.available_skills = ["Python", "React", "AWS", "SQL", "ML", "FastAPI", "Docker"]
-            
-        with st.expander("➕ Add Custom Skill"):
-            new_skill = st.text_input("Enter skill name")
-            if st.button("ADD TO POOL"):
-                if new_skill and new_skill not in st.session_state.available_skills:
-                    st.session_state.available_skills.append(new_skill)
-                    st.rerun()
-
-        # 🎯 SKILLS SELECTION SYNC (PRODUCTION SAFE)
-        if "skills_state" not in st.session_state:
-            st.session_state.skills_state = ["Python"]
-            
-        c_skills = st.multiselect(
+        # 🎯 USER-DEFINED COMPETENCY ENGINE (ELITE UPGRADE)
+        c_skills_raw = st.text_input(
             "Core Competencies", 
-            st.session_state.available_skills, 
-            default=[s for s in st.session_state.skills_state if s in st.session_state.available_skills]
+            placeholder="e.g. Python, AWS, System Design, React",
+            help="Type your skills separated by commas."
         )
-        st.session_state.skills_state = c_skills
-        st.caption("AI will generate questions based on these selections.")
+        c_skills = [s.strip() for s in c_skills_raw.split(",")] if c_skills_raw else []
+        st.caption("AI will build the interview room around the skills you type above.")
         
         c_exp = st.selectbox("Experience Level", ["Fresher", "1-3 years", "3-5 years", "5+ years"], key="p5_exp")
         c_type = st.selectbox("Interview Type", ["Technical", "HR", "System Design", "Mixed"], key="p5_type")
