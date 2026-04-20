@@ -7,6 +7,7 @@ import pandas as pd
 import json
 import re
 from fpdf import FPDF
+from streamlit_mic_recorder import mic_recorder
 
 # --- SYSTEM SETUP ---
 import os
@@ -318,7 +319,17 @@ elif st.session_state.app_state == "INTERVIEW":
         existing_ans = st.session_state.answers.get(idx, {}).get("answer", "")
         
         if st.session_state.get("stt_active"):
-            st.caption("🎤 Speak your answer or edit the transcript below:")
+            st.caption("🎤 Click the mic to record your answer or edit the transcript below:")
+            audio = mic_recorder(start_prompt="Start Recording 🎙️", stop_prompt="Stop Recording ⏹️", key=f"mic_{idx}")
+            
+            if audio:
+                if f"audio_processed_{idx}" not in st.session_state:
+                    with st.spinner("Transcribing..."):
+                        transcription = ai_engine.transcribe_audio(audio['bytes'])
+                        st.session_state[f"ans_{idx}"] = transcription
+                        st.session_state[f"audio_processed_{idx}"] = True
+                        st.rerun()
+
             ans = st.text_area("Transcript Editor", height=200, key=f"ans_{idx}", value=existing_ans)
         else:
             ans = st.text_area("Technical Response", height=250, key=f"ans_{idx}", value=existing_ans)

@@ -1,70 +1,16 @@
-import random
-import json
-import re
-import streamlit as st
-import time
-import datetime
 import google.generativeai as genai
 import os
-
-# Configure Gemini
-# Prioritize Streamlit Secrets, then environment variables
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY") or "AIzaSyBVYhalb3qz0gofxe0VvUlZCARNUh9DSMM"
-genai.configure(api_key=GEMINI_API_KEY)
+import re
+import json
+import time
+import datetime
+import streamlit as st
 
 class AIEngine:
     def __init__(self):
-        self.version = "2.1.0-Stable"
-        self.model = genai.GenerativeModel("gemini-1.5-flash")
-
-    @st.cache_data(ttl=3600, show_spinner=False)
-    def generate_questions_cached(self, role, skills_str, difficulty, count, seed="STABLE"):
-        """
-        GEMINI POWERED: Generates high-quality technical questions with improved prompting, parsing, and retries.
-        """
-        max_retries = 3
-        fallback_questions = [
-            f"Explain your approach to {role} architecture.",
-            f"Describe a challenging project you worked on related to {role}.",
-            f"How do you stay updated with the latest trends in {skills_str}?",
-            f"Describe your process for debugging complex issues in {role} projects.",
-            f"What are the most critical security considerations in your work?"
-        ]
-        
-        for attempt in range(max_retries):
-            try:
-                prompt = f"""
-                You are a professional technical interviewer.
-                Generate {count} interview questions for:
-                Role: {role}
-                Skills: {skills_str}
-                Difficulty: {difficulty}
-
-                Also ensure:
-                - Questions test real-world knowledge
-                - Mix theory + scenario-based
-                - Avoid repetition
-                - Return ONLY the questions, one per line.
-                - Do not include numbers, introductory or concluding text.
-                """
-                
-                response = self.model.generate_content(prompt)
-                raw_text = response.text.strip()
-                
-                # Safer parsing: split lines and filter empty ones
-                questions = [line.strip() for line in raw_text.split("\n") if line.strip()]
-                
-                # If AI still included numbers, clean them up
-                clean_questions = []
-                for q in questions:
-                    q = re.sub(r'^\d+[\.\)]\s*', '', q)
-                    clean_questions.append(q)
-                
-                if clean_questions:
         # API Key Retrieval (Streamlit Secrets -> Environment)
         api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
         if not api_key:
-            # Fallback for local dev if needed, but production MUST have it
             api_key = os.getenv("GEMINI_API_KEY")
         
         if not api_key:
@@ -73,6 +19,22 @@ class AIEngine:
         
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-1.5-flash')
+
+    def transcribe_audio(self, audio_bytes):
+        """
+        Transcribe audio bytes using Gemini 1.5 Flash.
+        """
+        try:
+            # Wrap bytes for Gemini
+            audio_part = {
+                "mime_type": "audio/wav",
+                "data": audio_bytes
+            }
+            prompt = "Transcribe the following audio precisely. Return ONLY the transcription text."
+            response = self.model.generate_content([prompt, audio_part])
+            return response.text.strip()
+        except Exception as e:
+            return f"Transcription Error: {str(e)}"
 
     @st.cache_data
     def generate_questions_cached(_self, role, skills, difficulty, count):

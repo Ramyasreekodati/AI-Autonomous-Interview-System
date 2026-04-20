@@ -4,3 +4,4 @@ pandas
 fpdf2
 python-dotenv
 pytest
+streamlit-mic-recorder
