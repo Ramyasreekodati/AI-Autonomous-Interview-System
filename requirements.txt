@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 streamlit
 fastapi
 uvicorn
@@ -12,8 +13,8 @@ opencv-python-headless
 mediapipe
 pydantic
 vaderSentiment
-openai-whisper
 torch
+openai-whisper
 python-multipart
 python-dotenv
 googlesearch-python
