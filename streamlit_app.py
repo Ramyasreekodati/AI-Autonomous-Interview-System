@@ -270,6 +270,14 @@ with st.sidebar:
     
     # MASTER CORRECTION: Sidebar Dynamic View
     if st.session_state.app_state == "LANDING":
+        # 🛡️ API HEALTH CHECK (MASTER GUARD)
+        api_key = st.secrets.get("GEMINI_API_KEY", "")
+        if not api_key or "REPLACE_WITH" in api_key:
+            st.error("❌ API KEY: MISSING/INVALID")
+            st.warning("Please update `.streamlit/secrets.toml` with your Gemini API Key.")
+        else:
+            st.success("✅ API KEY: ACTIVE")
+            
         st.markdown("#### 👤 Candidate Configuration")
         c_name = st.text_input("Full Name", key="p5_name")
         c_role = st.text_input("Target Role", "Senior Engineer", key="p5_role")
