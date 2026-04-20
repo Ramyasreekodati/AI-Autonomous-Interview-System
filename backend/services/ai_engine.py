@@ -8,13 +8,14 @@ import streamlit as st
 
 class AIEngine:
     def __init__(self):
-        # API Key Retrieval (Streamlit Secrets -> Environment)
-        api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
-        if not api_key:
+        # API Key Retrieval
+        try:
+            api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+        except:
             api_key = os.getenv("GEMINI_API_KEY")
         
         if not api_key:
-            st.error("Missing Gemini API Key. Please configure GEMINI_API_KEY in Streamlit Secrets.")
+            st.warning("⚠️ GEMINI_API_KEY missing. Update .streamlit/secrets.toml")
             st.stop()
         
         genai.configure(api_key=api_key)

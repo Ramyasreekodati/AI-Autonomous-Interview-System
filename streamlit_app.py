@@ -257,7 +257,20 @@ with st.sidebar:
         st.markdown("#### 👤 Candidate Configuration")
         c_name = st.text_input("Full Name", key="p5_name")
         c_role = st.text_input("Target Role", "Senior Engineer", key="p5_role")
-        c_skills = st.multiselect("Core Competencies", ["Python", "React", "AWS", "SQL", "ML"], ["Python"], key="p5_skills")
+        
+        # 🎯 SKILLS SELECTION SYNC (UI BUG FIX)
+        if "skills_state" not in st.session_state:
+            st.session_state.skills_state = ["Python"]
+            
+        c_skills = st.multiselect(
+            "Core Competencies", 
+            ["Python", "React", "AWS", "SQL", "ML", "FastAPI", "Docker"], 
+            default=st.session_state.skills_state,
+            key="skills_select_widget"
+        )
+        st.session_state.skills_state = c_skills
+        st.caption("Select multiple skills relevant to the role")
+        
         c_diff = st.selectbox("Audit Intensity", ["Basic", "Standard", "Elite"], key="p5_diff")
         c_count = st.number_input("Question Count", 1, 10, 3, key="p5_count")
         
