@@ -19,7 +19,7 @@ class AIEngine:
             st.stop()
         
         genai.configure(api_key=api_key)
-        # 🛡️ PRODUCTION STABLE MODEL
+        # 🛡️ PRODUCTION STABLE MODEL (Avoids 404/API conflicts)
         self.model = genai.GenerativeModel('gemini-1.5-flash')
 
     def transcribe_audio(self, audio_bytes):
@@ -45,57 +45,51 @@ class AIEngine:
         """
         try:
             prompt = f"""
-            You are a senior technical interviewer conducting a real interview.
+            You are a senior technical interviewer.
+            Generate EXACTLY {count} interview questions for the following candidate profile.
 
-            Generate high-quality interview questions based on the candidate profile.
-
-            CANDIDATE PROFILE
+            CANDIDATE PROFILE:
             - Role: {role}
             - Skills: {', '.join(skills)}
-            - Experience Level: {experience}
+            - Experience: {experience}
             - Interview Level: {difficulty}
-            - Interview Type: {interview_type}
-            - Question Style: {style}
-            - Number of Questions: {count}
+            - Type: {interview_type}
+            - Style: {style}
 
-            INSTRUCTIONS:
-            1. Questions must match the candidate's experience level ({experience}).
-            2. Questions must focus on listed skills ({', '.join(skills)}).
-            3. Adjust difficulty based on interview level ({difficulty}).
-            4. Follow interview type:
-               - Technical -> deep technical questions
-               - HR -> behavioral questions
-               - System Design -> architecture questions
-               - Mixed -> combination
-            5. Follow question style:
-               - Conceptual -> theory-based
-               - Scenario-Based -> real-world problems
-               - Coding -> problem-solving
-               - Mixed -> combination
+            STRICT RULES:
+            1. Generate EXACTLY {count} questions.
+            2. DO NOT generate less or more.
+            3. Each question must be on a new line and numbered (1., 2., 3...).
+            4. Questions must be highly relevant to {', '.join(skills)}.
+            5. No generic intros or outros.
 
-            RULES:
-            - Do NOT generate generic questions.
-            - Do NOT repeat questions.
-            - Make questions realistic (like real interviews).
-            - Keep questions clear and concise.
-            - Avoid unnecessary explanations.
-
-            OUTPUT:
-            Return ONLY a numbered list of questions.
+            OUTPUT FORMAT:
+            1. Question
+            2. Question
+            ...
             """
             
             response = _self.model.generate_content(prompt)
-            # ROBUST EXTRACTION: Handle various numbering formats (1., 1), 1:)
-            lines = [re.sub(r'^\d+[\.\)\:]\s*', '', l).strip() for l in response.text.strip().split('\n') if l.strip()]
+            raw = response.text.strip()
             
-            # BIAS AUDIT (REGEX LAYER)
-            questions = [q for q in lines if not re.search(r'\b(he|she|him|her|his|hers)\b', q, re.I)]
+            # ROBUST PARSING (REGEX)
+            questions = re.findall(r"\d+[\.\)\:]\s*(.+)", raw)
             
+            # FALLBACK PARSING
+            if len(questions) < count:
+                questions = [l.strip() for l in raw.split('\n') if l.strip() and not l.startswith('-')]
+            
+            # CLEANUP & BIAS AUDIT
+            questions = [re.sub(r'^\d+[\.\)\:]\s*', '', q).strip() for q in questions]
+            questions = [q for q in questions if not re.search(r'\b(he|she|him|her|his|hers)\b', q, re.I)]
+            
+            # FINAL SAFETY: Ensure count and uniqueness
             if not questions:
-                return [f"As a {experience} professional, how do you handle {skills[0]} at scale?"] * count
-            return (questions * ((count // len(questions)) + 1))[:count]
+                return [f"As a {experience} professional, how do you manage {skills[0]} lifecycle?"] * count
+            
+            return questions[:count] if len(questions) >= count else (questions * count)[:count]
         except Exception:
-            return [f"Explain your approach to {skills[0]} in a high-concurrency {role} role."] * count
+            return [f"Explain your experience with {skills[0]} in the context of a {role} role."] * count
 
     def evaluate_answer(self, question, answer):
         """
