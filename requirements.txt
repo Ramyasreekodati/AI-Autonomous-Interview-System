@@ -9,12 +9,10 @@ passlib
 cryptography
 bcrypt
 numpy
-opencv-python-headless
-mediapipe
 pydantic
 vaderSentiment
-torch
 openai-whisper
+torch
 python-multipart
 python-dotenv
 googlesearch-python
