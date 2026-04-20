@@ -18,12 +18,18 @@ class AIEngine:
         self.model = genai.GenerativeModel("gemini-1.5-flash")
 
     @st.cache_data(ttl=3600, show_spinner=False)
-    def generate_questions_cached(role, skills_str, difficulty, count, seed="STABLE"):
+    def generate_questions_cached(self, role, skills_str, difficulty, count, seed="STABLE"):
         """
         GEMINI POWERED: Generates high-quality technical questions with improved prompting, parsing, and retries.
         """
-        instance = AIEngine()
         max_retries = 3
+        fallback_questions = [
+            f"Explain your approach to {role} architecture.",
+            f"Describe a challenging project you worked on related to {role}.",
+            f"How do you stay updated with the latest trends in {skills_str}?",
+            f"Describe your process for debugging complex issues in {role} projects.",
+            f"What are the most critical security considerations in your work?"
+        ]
         
         for attempt in range(max_retries):
             try:
@@ -42,7 +48,7 @@ class AIEngine:
                 - Do not include numbers, introductory or concluding text.
                 """
                 
-                response = instance.model.generate_content(prompt)
+                response = self.model.generate_content(prompt)
                 raw_text = response.text.strip()
                 
                 # Safer parsing: split lines and filter empty ones
@@ -56,12 +62,12 @@ class AIEngine:
                 
                 if clean_questions:
                     return clean_questions[:count]
-            except Exception as e:
+            except Exception:
                 if attempt == max_retries - 1:
-                    return [f"Describe a challenging project you worked on related to {role}."]
+                    return (fallback_questions * 2)[:count] # Ensure correct count
                 time.sleep(1) # Wait before retry
         
-        return [f"Explain your approach to {role} architecture."]
+        return (fallback_questions * 2)[:count]
 
     def evaluate_answer(self, question, answer):
         """

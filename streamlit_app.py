@@ -43,33 +43,33 @@ class InterviewController:
 
     @staticmethod
     def commit_answer(idx, question, answer):
-        if not answer.strip(): return False
+        clean_ans = answer.strip()
+        # MANDATORY VALIDATION
+        if not clean_ans:
+            st.warning("⚠️ Response cannot be empty.")
+            return False
+        if len(clean_ans) < 5:
+            st.warning("⚠️ Response is too short (minimum 5 characters required).")
+            return False
+        import re
+        if re.match(r'^[a-zA-Z\s]{1,4}$', clean_ans):
+            st.warning("⚠️ Invalid input detected. Please provide a meaningful answer.")
+            return False
+
+        # ENFORCED DATA STRUCTURE (PHASE 1 COMPLIANT)
         st.session_state.answers[idx] = {
-            "q": question, "a": answer, "ts": datetime.datetime.now().isoformat()
+            "session_id": st.session_state.session_id,
+            "question_id": idx,
+            "question": question,
+            "answer": clean_ans,
+            "timestamp": datetime.datetime.now().isoformat()
         }
         return True
 
     @staticmethod
     def finalize_audit():
-        with st.spinner("Executing Intelligent Evaluation Synthesis..."):
-            for q_id, data in st.session_state.answers.items():
-                # SAFE FALLBACK: Evaluation should never crash the report
-                try:
-                    st.session_state.evaluations[q_id] = ai_engine.evaluate_answer(data["q"], data["a"])
-                except:
-                    st.session_state.evaluations[q_id] = {"score": 5.0, "passed_validation": True, "justification": "Generic evaluation due to system jitter."}
-            
-            try:
-                st.session_state.final_result = ai_engine.generate_final_result(
-                    st.session_state.evaluations, 
-                    st.session_state.alerts
-                )
-            except:
-                st.session_state.final_result = {
-                    "interview_score": 70, "behavior_score": 100, "final_decision": "pass", 
-                    "justification": "Manual audit recommended due to evaluation synthesis limit."
-                }
-        st.session_state.app_state = "REPORT"
+        # PHASE CONTROL: Evaluation locked in Phase 1
+        st.session_state.app_state = "COMPLETED"
 
 # --------------------------------------------------
 # 2. 🛡️ DATA LAYER
@@ -141,9 +141,6 @@ st.markdown("""
         transition: all 0.2s ease;
     }
     .stButton>button:hover { background: #357ABD; border: none; transform: translateY(-1px); }
-
-    /* Compact Metrics */
-    [data-testid="stMetricValue"] { font-size: 1.8rem !important; font-weight: 700 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -155,17 +152,14 @@ with st.sidebar:
     st.caption(f"Audit Session: #{st.session_state.session_id}")
     st.divider()
     
-    # DEBUG MODE (Hidden by default, toggleable)
     if st.toggle("Show System Status"):
+        st.write(f"**Phase:** 1 (Core)")
+        st.write(f"**Answers:** {len(st.session_state.answers)}")
         st.write(f"**State:** {st.session_state.app_state}")
-        st.write(f"**Questions Loaded:** {len(st.session_state.questions)}")
-        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-        key_status = "✅ ACTIVE" if GEMINI_API_KEY else "❌ MISSING"
-        st.write(f"**Gemini API:** {key_status}")
 
     if st.session_state.app_state != "LANDING":
         st.write(f"**Target:** {st.session_state.candidate_info.get('role')}")
-        if st.button("RESET AUDIT"):
+        if st.button("RESET SESSION"):
             st.session_state.clear()
             st.rerun()
 
@@ -173,9 +167,8 @@ if st.session_state.app_state == "LANDING":
     c1, mid, c2 = st.columns([1, 2, 1])
     with mid:
         st.markdown("<p class='header-text'>AI Talent Auditor</p>", unsafe_allow_html=True)
-        st.info("Industry-grade automated assessment suite.")
+        st.info("Phase 1: Core Interview System")
         
-        # SLIMMER PROFILE FORM
         with st.container():
             name = st.text_input("Full Name")
             role = st.text_input("Role", "Senior Architect")
@@ -185,60 +178,53 @@ if st.session_state.app_state == "LANDING":
             diff = c_a.selectbox("Difficulty", ["Basic", "Standard", "Elite"])
             count = c_b.number_input("Questions", 1, 10, 3)
             
-            if st.button("START PROFESSIONAL ASSESSMENT", use_container_width=True):
+            if st.button("START CORE ASSESSMENT", use_container_width=True):
                 if name and skills:
                     InterviewController.initialize_session(name, role, skills, diff, count)
                     st.rerun()
 
 elif st.session_state.app_state == "INTERVIEW":
     idx = st.session_state.q_idx
-    
-    # 🛡️ DEFENSIVE CHECK: Ensure we have questions before rendering
     if not st.session_state.questions:
-        st.error("No questions were generated. Please reset and try again.")
-        if st.button("RETRY GENERATION"):
-            st.session_state.clear()
-            st.rerun()
+        st.error("No questions generated.")
         st.stop()
 
     if idx < len(st.session_state.questions):
         st.progress((idx + 1) / len(st.session_state.questions))
         
-        # REMOVED SURVEILLANCE COLUMN FOR STABILITY
-        col_main, col_spacer = st.columns([3, 0.1])
+        # 🎤 INPUT MODE: AUDIO TOGGLE
+        st.toggle("🎙️ Enable Audio Transcript (STT Active)", key="stt_active")
         
-        with col_main:
-            q_text = st.session_state.questions[idx]
-            st.markdown(f"<div class='card'><b>QUESTION {idx+1}:</b><br>{q_text}</div>", unsafe_allow_html=True)
-            
-            # SIMPLE INPUT MODE
-            ans = st.text_area("Your Response", height=250, key=f"ans_{idx}")
+        q_text = st.session_state.questions[idx]
+        st.markdown(f"<div class='card'><b>QUESTION {idx+1}:</b><br>{q_text}</div>", unsafe_allow_html=True)
+        
+        # Persistence check: load existing answer if any
+        existing_ans = st.session_state.answers.get(idx, {}).get("answer", "")
+        ans = st.text_area("Your Response", height=250, key=f"ans_{idx}", value=existing_ans)
 
-            if st.button("COMMIT RESPONSE →", use_container_width=True):
-                if InterviewController.commit_answer(idx, q_text, ans):
-                    st.session_state.q_idx += 1
-                    st.rerun()
-                else: st.warning("Empty response blocked.")
+        col_p, col_n = st.columns([1, 2])
+        if idx > 0 and col_p.button("← BACK"):
+            st.session_state.q_idx -= 1
+            st.rerun()
+            
+        if col_n.button("COMMIT & NEXT →", use_container_width=True):
+            if InterviewController.commit_answer(idx, q_text, ans):
+                st.session_state.q_idx += 1
+                st.rerun()
     else:
-        st.success("✔ Data Collection Complete.")
-        if st.button("EXECUTE FINAL INTEL SYNTHESIS", use_container_width=True):
+        st.success("✔ Phase 1 Complete.")
+        if st.button("FINALIZE DATA COLLECTION", use_container_width=True):
             InterviewController.finalize_audit()
             st.rerun()
 
-elif st.session_state.app_state == "REPORT":
-    res = st.session_state.final_result
-    st.markdown("<p class='header-text'>Audit Decision Terminal</p>", unsafe_allow_html=True)
+elif st.session_state.app_state == "COMPLETED":
+    st.markdown("<p class='header-text'>Interview Complete</p>", unsafe_allow_html=True)
+    st.success("Phase 1 Data has been collected and stored in the session state.")
+    st.info("Evaluation and Reporting are disabled in Phase 1.")
     
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Tech Merit", f"{res['interview_score']}%")
-    m2.metric("Integrity", f"{res['behavior_score']}%")
-    m3.metric("Decision", res['final_decision'].upper())
-
-    st.markdown(f"<div class='card'><b>DETERMINISTIC JUSTIFICATION:</b><br>{res['justification']}</div>", unsafe_allow_html=True)
+    with st.expander("VIEW COLLECTED DATA (STRUCTURED)"):
+        st.json(st.session_state.answers)
     
-    with st.expander("FORENSIC SIGNAL TRACE (JSON)"):
-        st.json(res)
-    
-    if st.button("NEW ASSESSMENT CYCLE"):
+    if st.button("NEW INTERVIEW"):
         st.session_state.clear()
         st.rerun()
