@@ -1,5 +1,6 @@
-streamlit
 google-generativeai
-numpy
+streamlit
 pandas
-reportlab
+fpdf2
+python-dotenv
+pytest

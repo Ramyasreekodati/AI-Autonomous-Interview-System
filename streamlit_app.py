@@ -4,6 +4,9 @@ import os
 import sys
 import uuid
 import pandas as pd
+import json
+import re
+from fpdf import FPDF
 
 # --- SYSTEM SETUP ---
 import os
@@ -142,10 +145,31 @@ class InterviewController:
                 )
             except:
                 st.session_state.final_result = {
-                    "interview_score": 0, "behavior_score": 100, "final_decision": "fail", 
-                    "justification": "Synthesis failure."
+                    "interview_score": 0, "behavior_score": 100, "risk_level": "LOW", "alerts": [],
+                    "final_decision": "REJECTED", "justification": "Synthesis failure."
                 }
         st.session_state.app_state = "REPORT"
+
+    @staticmethod
+    def generate_pdf(res):
+        try:
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", 'B', 16)
+            pdf.cell(200, 10, "AUDIT REPORT - RECRUITAI ELITE v1.2.5", ln=True, align='C')
+            pdf.ln(10)
+            pdf.set_font("Arial", size=12)
+            pdf.cell(200, 10, f"Candidate: {st.session_state.candidate_info.get('name', 'N/A')}", ln=True)
+            pdf.cell(200, 10, f"Session: {st.session_state.session_id}", ln=True)
+            pdf.ln(5)
+            pdf.cell(200, 10, f"Final Decision: {res['final_decision']}", ln=True)
+            pdf.cell(200, 10, f"Merit Score: {res['interview_score']}%", ln=True)
+            pdf.cell(200, 10, f"Integrity Score: {res['behavior_score']}%", ln=True)
+            pdf.ln(5)
+            pdf.multi_cell(0, 10, f"Justification: {res['justification']}")
+            return pdf.output(dest='S').encode('latin-1')
+        except:
+            return None
 
 # --------------------------------------------------
 # 2. 🛡️ DATA LAYER
@@ -221,88 +245,85 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --------------------------------------------------
-# 4. UI RENDERER
+# 4. UI RENDERER (PRODUCTION v1.2.5)
 # --------------------------------------------------
 with st.sidebar:
     st.markdown("### 💎 RECRUITAI **ELITE**")
-    st.caption(f"Audit Session: #{st.session_state.session_id}")
+    st.caption(f"Audit Session: #{st.session_state.session_id} | v1.2.5")
     st.divider()
     
-    if st.toggle("Show System Status"):
-        st.write(f"**Phase:** 2 (Evaluation)")
-        st.write(f"**Answers:** {len(st.session_state.answers)}")
-        st.write(f"**Alerts:** {len(st.session_state.alerts)}")
-        st.write(f"**State:** {st.session_state.app_state}")
+    if st.session_state.app_state == "LANDING":
+        st.markdown("#### 👤 Candidate Configuration")
+        c_name = st.text_input("Full Name", key="p5_name")
+        c_role = st.text_input("Target Role", "Senior Engineer", key="p5_role")
+        c_skills = st.multiselect("Core Competencies", ["Python", "React", "AWS", "SQL", "ML"], ["Python"], key="p5_skills")
+        c_diff = st.selectbox("Audit Intensity", ["Basic", "Standard", "Elite"], key="p5_diff")
+        c_count = st.number_input("Question Count", 1, 10, 3, key="p5_count")
+        
+        if st.button("🚀 INITIALIZE PRODUCTION AUDIT", use_container_width=True):
+            if c_name and c_skills:
+                InterviewController.initialize_session(c_name, c_role, c_skills, c_diff, c_count)
+                st.rerun()
+    else:
+        st.write(f"**Candidate:** {st.session_state.candidate_info.get('name')}")
+        st.write(f"**Target:** {st.session_state.candidate_info.get('role')}")
+        
+        if st.toggle("Show Forensic Status"):
+            st.write(f"**Integrity:** {len(st.session_state.alerts)} signals")
+            st.write(f"**Progress:** {st.session_state.q_idx + 1}/{len(st.session_state.questions)}")
+
+        if st.button("ABORT SESSION"):
+            st.session_state.clear()
+            st.rerun()
 
     st.divider()
-    st.session_state.proctoring_enabled = st.toggle("🔒 AI Proctoring", value=True)
+    st.session_state.proctoring_enabled = st.toggle("🔒 AI Proctoring (Active)", value=True)
     
     if st.session_state.proctoring_enabled and st.session_state.app_state == "INTERVIEW":
         img = st.camera_input("Audit Feed", label_visibility="collapsed")
         status = ProctoringService.run_audit(img, st.session_state.q_idx)
         
-        # STATUS ENGINE UI
         color = "#10B981" if status == "NORMAL" else "#F59E0B" if status == "WARNING" else "#EF4444"
         st.markdown(f"""
             <div style="padding:10px; border-radius:8px; background:{color}22; border:1px solid {color}; text-align:center;">
                 <b style="color:{color};">AUDIT: {status}</b>
             </div>
         """, unsafe_allow_html=True)
-        
-        if st.session_state.alerts:
-            st.caption(f"Last Alert: {st.session_state.alerts[-1]['alert_type'].upper()}")
-
-    if st.session_state.app_state != "LANDING":
-        st.write(f"**Target:** {st.session_state.candidate_info.get('role')}")
-        if st.button("RESET SESSION"):
-            st.session_state.clear()
-            st.rerun()
 
 if st.session_state.app_state == "LANDING":
-    c1, mid, c2 = st.columns([1, 2, 1])
-    with mid:
-        st.markdown("<p class='header-text'>AI Talent Auditor</p>", unsafe_allow_html=True)
-        st.info("Phase 2: Evaluation Engine")
-        
-        with st.container():
-            name = st.text_input("Full Name")
-            role = st.text_input("Role", "Senior Architect")
-            skills = st.multiselect("Key Competencies", ["Python", "AWS", "Security", "ML"], ["Python"])
-            
-            c_a, c_b = st.columns(2)
-            diff = c_a.selectbox("Difficulty", ["Basic", "Standard", "Elite"])
-            count = c_b.number_input("Questions", 1, 10, 3)
-            
-            if st.button("START EVALUATION CYCLE", use_container_width=True):
-                if name and skills:
-                    InterviewController.initialize_session(name, role, skills, diff, count)
-                    st.rerun()
+    st.markdown("<p class='header-text'>Autonomous Talent Audit</p>", unsafe_allow_html=True)
+    st.info("System Ready. Please configure candidate details in the **Left Panel** to begin.")
+    
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Engine", "Gemini 1.5")
+    c2.metric("Proctoring", "Deterministic")
+    c3.metric("Version", "v1.2.5")
 
 elif st.session_state.app_state == "INTERVIEW":
     idx = st.session_state.q_idx
-    if not st.session_state.questions:
-        st.error("No questions generated.")
-        st.stop()
-
     if idx < len(st.session_state.questions):
         st.progress((idx + 1) / len(st.session_state.questions))
         
-        # 🎤 INPUT MODE: AUDIO TOGGLE
-        st.toggle("🎙️ Enable Audio Transcript (STT Active)", key="stt_active")
+        # 🎤 AUDIO SYSTEM (PHASE 5)
+        st.toggle("🎙️ Enable Audio Transcript (Speak/Type Mode)", key="stt_active")
         
         q_text = st.session_state.questions[idx]
-        st.markdown(f"<div class='card'><b>QUESTION {idx+1}:</b><br>{q_text}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='card'><b>AUDIT QUESTION {idx+1}:</b><br>{q_text}</div>", unsafe_allow_html=True)
         
-        # Persistence check: load existing answer if any
         existing_ans = st.session_state.answers.get(idx, {}).get("answer", "")
-        ans = st.text_area("Your Response", height=250, key=f"ans_{idx}", value=existing_ans)
+        
+        if st.session_state.get("stt_active"):
+            st.caption("🎤 Speak your answer or edit the transcript below:")
+            ans = st.text_area("Transcript Editor", height=200, key=f"ans_{idx}", value=existing_ans)
+        else:
+            ans = st.text_area("Technical Response", height=250, key=f"ans_{idx}", value=existing_ans)
 
         col_p, col_n = st.columns([1, 2])
-        if idx > 0 and col_p.button("← BACK"):
+        if idx > 0 and col_p.button("← PREVIOUS"):
             st.session_state.q_idx -= 1
             st.rerun()
             
-        if col_n.button("COMMIT & NEXT →", use_container_width=True):
+        if col_n.button("COMMIT & CONTINUE →", use_container_width=True):
             if InterviewController.commit_answer(idx, q_text, ans):
                 st.session_state.last_submit_time = time.time()
                 st.session_state.q_idx += 1
@@ -315,20 +336,31 @@ elif st.session_state.app_state == "INTERVIEW":
 
 elif st.session_state.app_state == "REPORT":
     res = st.session_state.final_result
-    st.markdown("<p class='header-text'>Evaluation Decision Hub</p>", unsafe_allow_html=True)
+    st.markdown("<p class='header-text'>Audit Decision Terminal</p>", unsafe_allow_html=True)
     
     m1, m2, m3 = st.columns(3)
-    m1.metric("Avg Score", f"{res['interview_score']}%")
-    m2.metric("Trust Score", f"{res['behavior_score']}%")
-    m3.metric("Decision", res['final_decision'].upper())
+    m1.metric("Merit", f"{res['interview_score']}%")
+    m2.metric("Integrity", f"{res['behavior_score']}%")
+    m3.metric("Decision", res['final_decision'])
 
     st.markdown(f"<div class='card'><b>DETERMINISTIC JUSTIFICATION:</b><br>{res['justification']}</div>", unsafe_allow_html=True)
     
-    with st.expander("DETAILED INDEPENDENT EVALUATIONS"):
-        for q_id, eval_data in st.session_state.evaluations.items():
-            st.subheader(f"Q{q_id + 1}: {st.session_state.answers[q_id]['question']}")
-            st.json(eval_data)
-            st.divider()
+    # PDF EXPORT (PHASE 5)
+    pdf_data = InterviewController.generate_pdf(res)
+    if pdf_data:
+        st.download_button(
+            label="📄 DOWNLOAD AUDIT REPORT (PDF)",
+            data=pdf_data,
+            file_name=f"Audit_{st.session_state.session_id}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+
+    with st.expander("FORENSIC SIGNAL TRACE (JSON)"):
+        st.json(res)
+
+    with st.expander("SYSTEM AUDIT LOGS (REAL-TIME)"):
+        st.table(pd.DataFrame(st.session_state.logs))
     
     if st.button("NEW ASSESSMENT CYCLE"):
         st.session_state.clear()

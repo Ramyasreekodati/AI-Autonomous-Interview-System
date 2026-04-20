@@ -158,39 +158,52 @@ class AIEngine:
     @staticmethod
     def generate_final_result(evaluations, alerts):
         """
-        WEIGHTED INTELLIGENCE SYNTHESIS
+        DETERMINISTIC PHASE 4 INTEGRATION ENGINE
+        Fuses technical merit (Phase 2) and proctoring signals (Phase 3).
         """
+        # 1. INTERVIEW SCORE (Avg of Phase 2 Scores)
         if not evaluations:
-            return {"error": "Missing signals", "interview_score": 0, "behavior_score": 0, "final_decision": "fail"}
+            avg_tech = 0.0
+        else:
+            tech_scores = [float(ev.get('score', 0)) for ev in evaluations.values() if isinstance(ev, dict)]
+            if not tech_scores:
+                avg_tech = 0.0
+            else:
+                # Convert 0-10 scale to 0-100 scale
+                avg_tech = round((sum(tech_scores) / (len(tech_scores) * 10)) * 100, 1)
 
-        tech_scores = [ev.get('score', 0) for ev in evaluations.values()]
-        avg_tech = round((sum(tech_scores) / (len(tech_scores) * 10)) * 100, 1)
-
+        # 2. BEHAVIOR SCORE (Strict Weights: High -30, Medium -15, Low -5)
         behavior = 100
-        # Alerts are minimal in this version
         for a in alerts:
             sev = a.get('severity', 'low').lower()
-            if sev == "high": behavior -= 25
-            elif sev == "medium": behavior -= 10
+            if sev == "high": behavior -= 30
+            elif sev == "medium": behavior -= 15
             else: behavior -= 5
-        
         behavior = max(0, behavior)
-        final_score = round((0.7 * avg_tech) + (0.3 * behavior), 1)
-        risk = "low" if behavior > 80 else "medium" if behavior >= 50 else "high"
-        decision = "pass" if (final_score >= 60 and risk != "high") else "fail"
-        
-        all_strengths = []
-        for ev in evaluations.values(): 
-            if isinstance(ev, dict):
-                all_strengths.extend(ev.get('strengths', []))
-        
-        justification = f"Merit: {final_score}%. Key Strength: {all_strengths[0] if all_strengths else 'Direct communication'}."
-        
+
+        # 3. RISK ANALYSIS (Strict Thresholds: HIGH < 40, MEDIUM 40-70, LOW > 70)
+        risk = "HIGH" if behavior < 40 else "MEDIUM" if behavior <= 70 else "LOW"
+
+        # 4. FINAL DECISION ENGINE (Rule-Based Matrix)
+        if avg_tech >= 80 and risk == "LOW":
+            decision = "SELECTED"
+        elif avg_tech < 50 or risk == "HIGH":
+            decision = "REJECTED"
+        else:
+            decision = "REVIEW"
+
+        # 5. DETERMINISTIC JUSTIFICATION (No AI Hallucination)
+        justification = (
+            f"Candidate achieved a merit score of {avg_tech}% with a {risk.lower()} behavioral risk level. "
+            f"System recorded {len(alerts)} proctoring signals during the audit."
+        )
+
+        # 6. STRICT JSON OUTPUT (No extra keys)
         return {
             "interview_score": avg_tech,
             "behavior_score": behavior,
-            "final_score": final_score,
             "risk_level": risk,
+            "alerts": alerts,
             "final_decision": decision,
             "justification": justification
         }
