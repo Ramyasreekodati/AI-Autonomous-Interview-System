@@ -386,8 +386,18 @@ elif st.session_state.app_state == "INTERVIEW":
         existing_ans = st.session_state.answers.get(idx, {}).get("answer", "")
         
         if st.session_state.get("stt_active"):
-            st.info("🎤 **Voice input is currently unavailable.** Please type your answer below to continue the interview.")
-            ans = st.text_area("Transcript Editor", height=250, key=f"ans_{idx}", value=existing_ans)
+            st.caption("🎤 **Native Audio Mode Active:** Click the mic to record your answer or edit the transcript below:")
+            audio = mic_recorder(start_prompt="Start Recording 🎙️", stop_prompt="Stop Recording ⏹️", key=f"mic_{idx}")
+            
+            if audio:
+                if f"audio_processed_{idx}" not in st.session_state:
+                    with st.spinner("Transcribing via Gemini 2.5..."):
+                        transcription = ai_engine.transcribe_audio(audio['bytes'])
+                        st.session_state[f"ans_{idx}"] = transcription
+                        st.session_state[f"audio_processed_{idx}"] = True
+                        st.rerun()
+
+            ans = st.text_area("Transcript Editor", height=200, key=f"ans_{idx}", value=existing_ans)
         else:
             ans = st.text_area("Technical Response", height=250, key=f"ans_{idx}", value=existing_ans)
 
