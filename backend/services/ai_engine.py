@@ -8,90 +8,114 @@ import google.generativeai as genai
 import os
 
 # Configure Gemini
-GEMINI_API_KEY = "AIzaSyBVYhalb3qz0gofxe0VvUlZCARNUh9DSMM"
-genai.configure(api_key=GEMINI_API_KEY)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 class AIEngine:
     def __init__(self):
-        self.version = "2.0.0-Gemini"
+        self.version = "2.1.0-Stable"
         self.model = genai.GenerativeModel("gemini-1.5-flash")
 
     @st.cache_data(ttl=3600, show_spinner=False)
     def generate_questions_cached(role, skills_str, difficulty, count, seed="STABLE"):
         """
-        GEMINI POWERED: Generates high-quality technical questions.
+        GEMINI POWERED: Generates high-quality technical questions with improved prompting, parsing, and retries.
         """
-        try:
-            instance = AIEngine()
-            prompt = f"""
-            You are an expert technical interviewer.
-            Generate {count} unique interview questions for the following profile:
-            Role: {role}
-            Key Skills: {skills_str}
-            Difficulty: {difficulty}
+        instance = AIEngine()
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                prompt = f"""
+                You are a professional technical interviewer.
+                Generate {count} interview questions for:
+                Role: {role}
+                Skills: {skills_str}
+                Difficulty: {difficulty}
 
-            Rules:
-            1. Questions must be technical and practical.
-            2. Return ONLY a numbered list of questions.
-            3. Do not include any introductory or concluding text.
-            """
-            
-            response = instance.model.generate_content(prompt)
-            raw_text = response.text.strip()
-            
-            questions = []
-            for line in raw_text.split("\n"):
-                line = line.strip()
-                if line and ("." in line[:3] or line[0].isdigit()):
-                    q = re.sub(r'^\d+[\.\)]\s*', '', line)
-                    questions.append(q)
-            
-            return questions if questions else [f"Explain your approach to {role} architecture."]
-        except Exception as e:
-            # Fallback to deterministic logic if API fails
-            return [f"Standard technical inquiry for {role} role."]
+                Also ensure:
+                - Questions test real-world knowledge
+                - Mix theory + scenario-based
+                - Avoid repetition
+                - Return ONLY the questions, one per line.
+                - Do not include numbers, introductory or concluding text.
+                """
+                
+                response = instance.model.generate_content(prompt)
+                raw_text = response.text.strip()
+                
+                # Safer parsing: split lines and filter empty ones
+                questions = [line.strip() for line in raw_text.split("\n") if line.strip()]
+                
+                # If AI still included numbers, clean them up
+                clean_questions = []
+                for q in questions:
+                    q = re.sub(r'^\d+[\.\)]\s*', '', q)
+                    clean_questions.append(q)
+                
+                if clean_questions:
+                    return clean_questions[:count]
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    return [f"Describe a challenging project you worked on related to {role}."]
+                time.sleep(1) # Wait before retry
+        
+        return [f"Explain your approach to {role} architecture."]
 
     def evaluate_answer(self, question, answer):
         """
-        GEMINI POWERED: Sophisticated technical evaluation.
+        GEMINI POWERED: Sophisticated technical evaluation with robust JSON parsing and retries.
         """
-        try:
-            prompt = f"""
-            As a Senior Technical Auditor, evaluate this interview response:
-            Question: {question}
-            Candidate Answer: {answer}
+        default_response = {
+            "score": 5.0,
+            "keywords_matched": ["General Knowledge"],
+            "strengths": ["Communicated response"],
+            "weaknesses": ["System fallback triggered"],
+            "missing_concepts": ["API Detail"],
+            "passed_validation": True
+        }
+        
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                prompt = f"""
+                As a Senior Technical Auditor, evaluate this interview response:
+                Question: {question}
+                Candidate Answer: {answer}
 
-            Provide a JSON response with exactly these fields:
-            - score: (float between 0 and 10)
-            - keywords_matched: (list of strings)
-            - strengths: (list of strings)
-            - weaknesses: (list of strings)
-            - missing_concepts: (list of strings)
-            - passed_validation: (boolean)
-            """
-            
-            response = self.model.generate_content(prompt)
-            # Extract JSON from response (handling potential markdown formatting)
-            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group())
-            
-            raise ValueError("Invalid JSON response from AI")
-        except Exception as e:
-            # Safe Fallback
-            return {
-                "score": 5.0,
-                "keywords_matched": ["General Knowledge"],
-                "missing_concepts": ["API Timeout"],
-                "strengths": ["Clear communication"],
-                "weaknesses": ["Evaluation system jitter"],
-                "passed_validation": True
-            }
+                Provide a JSON response with exactly these fields:
+                - score: (float between 0 and 10)
+                - keywords_matched: (list of strings)
+                - strengths: (list of strings)
+                - weaknesses: (list of strings)
+                - missing_concepts: (list of strings)
+                - passed_validation: (boolean)
+                
+                Return ONLY the JSON.
+                """
+                
+                response = self.model.generate_content(prompt)
+                
+                # Improved JSON extraction
+                json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+                if json_match:
+                    try:
+                        return json.loads(json_match.group())
+                    except json.JSONDecodeError:
+                        pass # try again
+                
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    return default_response
+                time.sleep(1)
+        
+        return default_response
 
     @staticmethod
     def generate_final_result(evaluations, alerts):
         """
-        STRICT PHASE 4: WEIGHTED INTELLIGENCE SYNTHESIS
+        WEIGHTED INTELLIGENCE SYNTHESIS
         """
         if not evaluations:
             return {"error": "Missing signals", "interview_score": 0, "behavior_score": 0, "final_decision": "fail"}
@@ -100,7 +124,7 @@ class AIEngine:
         avg_tech = round((sum(tech_scores) / (len(tech_scores) * 10)) * 100, 1)
 
         behavior = 100
-        # Alerts are minimal in this version but kept for structure
+        # Alerts are minimal in this version
         for a in alerts:
             sev = a.get('severity', 'low').lower()
             if sev == "high": behavior -= 25
@@ -112,9 +136,11 @@ class AIEngine:
         risk = "low" if behavior > 80 else "medium" if behavior >= 50 else "high"
         decision = "pass" if (final_score >= 60 and risk != "high") else "fail"
         
-        # Aggregate feedback for justification
         all_strengths = []
-        for ev in evaluations.values(): all_strengths.extend(ev.get('strengths', []))
+        for ev in evaluations.values(): 
+            if isinstance(ev, dict):
+                all_strengths.extend(ev.get('strengths', []))
+        
         justification = f"Merit: {final_score}%. Key Strength: {all_strengths[0] if all_strengths else 'Direct communication'}."
         
         return {

@@ -18,11 +18,9 @@ if backend_path not in sys.path:
 
 try:
     from services.ai_engine import ai_engine
-    from services.surveillance import surveillance
-    from services.stt import stt_service
+    # surveillance and stt removed for stability
 except ImportError as e:
     st.error(f"Engine failure: {e}")
-    st.info("Check if all dependencies in requirements.txt are installed and if the 'backend' folder is correctly structured.")
     st.stop()
 
 # --------------------------------------------------
@@ -162,6 +160,10 @@ with st.sidebar:
             st.session_state.clear()
             st.rerun()
 
+    # CHECK FOR API KEY
+    if not os.getenv("GEMINI_API_KEY"):
+        st.warning("⚠️ GEMINI_API_KEY not found in environment. Please set it in Streamlit Secrets.")
+
 if st.session_state.app_state == "LANDING":
     c1, mid, c2 = st.columns([1, 2, 1])
     with mid:
@@ -195,20 +197,8 @@ elif st.session_state.app_state == "INTERVIEW":
             q_text = st.session_state.questions[idx]
             st.markdown(f"<div class='card'><b>QUESTION {idx+1}:</b><br>{q_text}</div>", unsafe_allow_html=True)
             
-            # SAFE STT FALLBACK
-            mode = st.radio("Input Mode", ["Keyboard", "Voice"], horizontal=True)
-            if mode == "Voice":
-                mic = st.audio_input("Dictate Response")
-                if mic:
-                    try:
-                        ans = stt_service.transcribe(mic)
-                    except:
-                        ans = "STT Error - Please use keyboard."
-                else:
-                    ans = ""
-                ans = st.text_area("Review Transcription", value=ans, height=150, key=f"ans_{idx}")
-            else:
-                ans = st.text_area("Your Response", height=250, key=f"ans_{idx}")
+            # SIMPLE INPUT MODE
+            ans = st.text_area("Your Response", height=250, key=f"ans_{idx}")
 
             if st.button("COMMIT RESPONSE →", use_container_width=True):
                 if InterviewController.commit_answer(idx, q_text, ans):

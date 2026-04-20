@@ -1,12 +1,5 @@
 streamlit
-fastapi
-uvicorn
-SQLAlchemy
-reportlab
-python-jose[cryptography]
-passlib[bcrypt]
+google-generativeai
 numpy
-opencv-python-headless
-mediapipe
-pydantic
-vaderSentiment
+pandas
+reportlab
