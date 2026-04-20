@@ -125,10 +125,6 @@ class InterviewController:
 
     @staticmethod
     def finalize_audit():
-        with st.spinner("Executing Intelligent Evaluation Synthesis..."):
-            for q_id, data in st.session_state.answers.items():
-                # PHASE 2: Independent Evaluation
-                try:
         # 🔄 MASTER UPGRADE: SYNTHESIS PULSE
         progress_bar = st.progress(0)
         status_text = st.empty()
