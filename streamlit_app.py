@@ -282,21 +282,29 @@ with st.sidebar:
         c_name = st.text_input("Full Name", key="p5_name")
         c_role = st.text_input("Target Role", "Senior Engineer", key="p5_role")
         
-        # 🎯 HYBRID COMPETENCY ENGINE (ELITE UPGRADE)
-        default_skills = ["Python", "React", "AWS", "SQL", "ML", "System Design", "FastAPI", "Docker"]
-        selected_skills = st.multiselect(
-            "Core Competencies (Dropdown)",
-            options=default_skills,
-            default=["Python"]
-        )
-        custom_skills = st.text_input(
-            "➕ Add Custom Skills (Comma Separated)",
-            placeholder="e.g. Kubernetes, Terraform, Rust"
-        )
-        custom_list = [s.strip() for s in custom_skills.split(",") if s.strip()]
-        c_skills = list(set(selected_skills + custom_list))
+        # 🎯 DYNAMIC SKILL SET DEFINITION (UX PIVOT)
+        st.markdown("### 🎯 Define Your Skill Set")
         
-        st.caption("Fusing guided pool and custom technical injection.")
+        c_skills_raw = st.text_input(
+            "Enter Your Skills (Primary)",
+            placeholder="e.g. Python, LangChain, NLP, Kubernetes",
+            help="AI will generate a custom interview based on what YOU type here."
+        )
+
+        suggested = ["Python", "React", "AWS", "SQL", "ML", "System Design", "FastAPI", "Docker"]
+        selected_suggestions = st.multiselect(
+            "Or pick from suggestions (optional)",
+            options=suggested
+        )
+
+        # Hybrid Fusion
+        typed_skills = [s.strip() for s in c_skills_raw.split(",") if s.strip()]
+        c_skills = list(set(typed_skills + selected_suggestions))
+        
+        if c_skills:
+            st.success(f"✅ AI ready to audit: {len(c_skills)} domains")
+        
+        st.divider()
         
         c_exp = st.selectbox("Experience Level", ["Fresher", "1-3 years", "3-5 years", "5+ years"], key="p5_exp")
         c_type = st.selectbox("Interview Type", ["Technical", "HR", "System Design", "Mixed"], key="p5_type")
