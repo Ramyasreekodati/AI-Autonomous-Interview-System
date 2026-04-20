@@ -1,4 +1,3 @@
---extra-index-url https://download.pytorch.org/whl/cpu
 streamlit
 fastapi
 uvicorn
@@ -11,8 +10,7 @@ bcrypt
 numpy
 pydantic
 vaderSentiment
-openai-whisper
-torch
+google-generativeai
 python-multipart
 python-dotenv
 googlesearch-python
