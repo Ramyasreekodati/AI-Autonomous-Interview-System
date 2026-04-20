@@ -266,17 +266,28 @@ with st.sidebar:
         c_name = st.text_input("Full Name", key="p5_name")
         c_role = st.text_input("Target Role", "Senior Engineer", key="p5_role")
         
+        # 🎯 DYNAMIC COMPETENCY ENGINE (PHASE 5 UPGRADE)
+        if "available_skills" not in st.session_state:
+            st.session_state.available_skills = ["Python", "React", "AWS", "SQL", "ML", "FastAPI", "Docker"]
+            
+        with st.expander("➕ Add Custom Skill"):
+            new_skill = st.text_input("Enter skill name")
+            if st.button("ADD TO POOL"):
+                if new_skill and new_skill not in st.session_state.available_skills:
+                    st.session_state.available_skills.append(new_skill)
+                    st.rerun()
+
         # 🎯 SKILLS SELECTION SYNC (PRODUCTION SAFE)
         if "skills_state" not in st.session_state:
             st.session_state.skills_state = ["Python"]
             
         c_skills = st.multiselect(
             "Core Competencies", 
-            ["Python", "React", "AWS", "SQL", "ML", "FastAPI", "Docker"], 
-            default=st.session_state.skills_state
+            st.session_state.available_skills, 
+            default=[s for s in st.session_state.skills_state if s in st.session_state.available_skills]
         )
         st.session_state.skills_state = c_skills
-        st.caption("Select multiple skills relevant to the role")
+        st.caption("AI will generate questions based on these selections.")
         
         c_diff = st.selectbox("Audit Intensity", ["Basic", "Standard", "Elite"], key="p5_diff")
         c_count = st.number_input("Question Count", 1, 10, 3, key="p5_count")
