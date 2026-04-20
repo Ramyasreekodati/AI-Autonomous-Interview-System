@@ -266,15 +266,14 @@ with st.sidebar:
         c_name = st.text_input("Full Name", key="p5_name")
         c_role = st.text_input("Target Role", "Senior Engineer", key="p5_role")
         
-        # 🎯 SKILLS SELECTION SYNC (UI BUG FIX)
+        # 🎯 SKILLS SELECTION SYNC (PRODUCTION SAFE)
         if "skills_state" not in st.session_state:
             st.session_state.skills_state = ["Python"]
             
         c_skills = st.multiselect(
             "Core Competencies", 
             ["Python", "React", "AWS", "SQL", "ML", "FastAPI", "Docker"], 
-            default=st.session_state.skills_state,
-            key="skills_select_widget"
+            default=st.session_state.skills_state
         )
         st.session_state.skills_state = c_skills
         st.caption("Select multiple skills relevant to the role")
