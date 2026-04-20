@@ -366,8 +366,8 @@ elif st.session_state.app_state == "INTERVIEW":
     if idx < len(st.session_state.questions):
         st.progress((idx + 1) / len(st.session_state.questions))
         
-        # 🎤 AUDIO SYSTEM (PHASE 5)
-        st.toggle("🎙️ Enable Audio Transcript (Speak/Type Mode)", key="stt_active")
+        # 🎤 AUDIO SYSTEM (PHASE 5 - SAFE MODE)
+        st.toggle("🎙️ Enable Audio Mode (Beta)", key="stt_active")
         
         q_text = st.session_state.questions[idx]
         st.markdown(f"<div class='card'><b>AUDIT QUESTION {idx+1}:</b><br>{q_text}</div>", unsafe_allow_html=True)
@@ -380,18 +380,8 @@ elif st.session_state.app_state == "INTERVIEW":
         existing_ans = st.session_state.answers.get(idx, {}).get("answer", "")
         
         if st.session_state.get("stt_active"):
-            st.caption("🎤 Click the mic to record your answer or edit the transcript below:")
-            audio = mic_recorder(start_prompt="Start Recording 🎙️", stop_prompt="Stop Recording ⏹️", key=f"mic_{idx}")
-            
-            if audio:
-                if f"audio_processed_{idx}" not in st.session_state:
-                    with st.spinner("Transcribing..."):
-                        transcription = ai_engine.transcribe_audio(audio['bytes'])
-                        st.session_state[f"ans_{idx}"] = transcription
-                        st.session_state[f"audio_processed_{idx}"] = True
-                        st.rerun()
-
-            ans = st.text_area("Transcript Editor", height=200, key=f"ans_{idx}", value=existing_ans)
+            st.warning("🎤 **Audio Transcription Safe Mode Active:** Gemini Audio API is currently restricted in your region. Please type your response below.")
+            ans = st.text_area("Transcript Editor", height=250, key=f"ans_{idx}", value=existing_ans)
         else:
             ans = st.text_area("Technical Response", height=250, key=f"ans_{idx}", value=existing_ans)
 
