@@ -85,12 +85,20 @@ class ProctoringService:
 # --------------------------------------------------
 class InterviewController:
     @staticmethod
-    def initialize_session(name, role, skills, diff, count):
-        st.session_state.candidate_info = {"name": name, "role": role}
-        # SAFE FALLBACK: If AI fails to generate, provide standard questions
+    def initialize_session(name, role, skills, diff, count, exp, i_type, style):
+        st.session_state.candidate_info = {
+            "name": name, 
+            "role": role,
+            "skills": skills,
+            "difficulty": diff,
+            "experience": exp,
+            "interview_type": i_type,
+            "style": style
+        }
+        
         try:
             st.session_state.questions = ai_engine.generate_questions_cached(
-                role, ",".join(skills), diff, count, st.session_state.session_id
+                role, skills, diff, count, exp, i_type, style
             )
         except Exception as e:
             st.session_state.questions = [f"Describe your experience with {role} and its core technical challenges."]
@@ -289,12 +297,15 @@ with st.sidebar:
         st.session_state.skills_state = c_skills
         st.caption("AI will generate questions based on these selections.")
         
-        c_diff = st.selectbox("Audit Intensity", ["Basic", "Standard", "Elite"], key="p5_diff")
+        c_exp = st.selectbox("Experience Level", ["Fresher", "1-3 years", "3-5 years", "5+ years"], key="p5_exp")
+        c_type = st.selectbox("Interview Type", ["Technical", "HR", "System Design", "Mixed"], key="p5_type")
+        c_style = st.selectbox("Question Style", ["Conceptual", "Scenario-Based", "Coding", "Mixed"], key="p5_style")
+        c_diff = st.selectbox("Interview Level", ["Basic", "Standard", "Elite"], key="p5_diff")
         c_count = st.number_input("Question Count", 1, 10, 3, key="p5_count")
         
         if st.button("🚀 INITIALIZE PRODUCTION AUDIT", use_container_width=True):
             if c_name and c_skills:
-                InterviewController.initialize_session(c_name, c_role, c_skills, c_diff, c_count)
+                InterviewController.initialize_session(c_name, c_role, c_skills, c_diff, c_count, c_exp, c_type, c_style)
                 st.rerun()
     else:
         st.markdown("#### 📡 LIVE SIGNAL TRACE")

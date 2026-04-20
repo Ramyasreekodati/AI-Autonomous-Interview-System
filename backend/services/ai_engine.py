@@ -38,27 +38,30 @@ class AIEngine:
             return f"Transcription Error: {str(e)}"
 
     @st.cache_data
-    def generate_questions_cached(_self, role, skills, difficulty, count):
+    def generate_questions_cached(_self, role, skills, difficulty, count, experience, interview_type, style):
         """
-        MASTER PROMPT 1: QUESTION GENERATION (PHASE 1)
+        MASTER PROMPT 1: QUESTION GENERATION (PROFESSIONAL UPGRADE)
         """
         try:
             prompt = f"""
-            You are a senior technical interviewer.
-            Generate high-quality interview questions.
+            You are a senior {role} interviewer with {experience} of experience.
+            Generate high-quality {interview_type} interview questions.
 
-            INPUT:
-            Role: {role}
-            Skills: {skills}
-            Difficulty: {difficulty}
-            Number of questions: {count}
+            INPUT PARAMETERS:
+            - Role: {role}
+            - Core Skills: {', '.join(skills)}
+            - Experience Level: {experience}
+            - Interview Level: {difficulty}
+            - Interview Type: {interview_type}
+            - Question Style: {style}
+            - Count: {count}
 
-            RULES:
-            - Questions must be realistic and industry-level
-            - Mix conceptual and practical questions
-            - Avoid generic questions
-            - Do NOT repeat
-            - Keep questions clear and concise
+            CORE INSTRUCTIONS:
+            - Questions must be realistic, highly technical, and industry-standard.
+            - Focus on {style} for {experience} candidates.
+            - Avoid generic or repetitive questions.
+            - Challenge the candidate based on the {difficulty} setting.
+            - Ensure questions are practical and map to real-world scenarios.
 
             OUTPUT:
             Return ONLY a numbered list of questions.
@@ -71,10 +74,10 @@ class AIEngine:
             questions = [q for q in lines if not re.search(r'\b(he|she|him|her|his|hers)\b', q, re.I)]
             
             if not questions:
-                return [f"Explain your approach to {skills[0]} at a {difficulty} level."]
+                return [f"As a {experience} professional, how do you handle {skills[0]} at scale?"]
             return questions[:count]
         except Exception:
-            return [f"What are the core principles of {skills[0]} in a production environment?"]
+            return [f"Explain your approach to {skills[0]} in a high-concurrency {role} role."]
 
     def evaluate_answer(self, question, answer):
         """
