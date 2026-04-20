@@ -129,27 +129,38 @@ class InterviewController:
             for q_id, data in st.session_state.answers.items():
                 # PHASE 2: Independent Evaluation
                 try:
-                    st.session_state.evaluations[q_id] = ai_engine.evaluate_answer(data["question"], data["answer"])
-                except Exception as e:
-                    st.session_state.evaluations[q_id] = {
-                        "score": 0.0,
-                        "keywords_matched": [],
-                        "missing_concepts": ["System Error"],
-                        "strengths": [],
-                        "weaknesses": [f"Evaluation crashed: {str(e)}"]
-                    }
-            
+        # 🔄 MASTER UPGRADE: SYNTHESIS PULSE
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        for i, (q_id, data) in enumerate(st.session_state.answers.items()):
+            status_text.text(f"Auditing Response {i+1} of {len(st.session_state.answers)}...")
             try:
-                st.session_state.final_result = ai_engine.generate_final_result(
-                    st.session_state.evaluations, 
-                    st.session_state.alerts
-                )
+                eval_data = ai_engine.evaluate_answer(data["question"], data["answer"])
             except:
-                st.session_state.final_result = {
-                    "interview_score": 0, "behavior_score": 100, "risk_level": "LOW", "alerts": [],
-                    "final_decision": "REJECTED", "justification": "Synthesis failure."
+                eval_data = {
+                    "score": 0.0,
+                    "keywords_matched": [],
+                    "missing_concepts": ["System Error"],
+                    "strengths": [],
+                    "weaknesses": ["Evaluation error"]
                 }
+            st.session_state.evaluations[q_id] = eval_data
+            progress_bar.progress((i + 1) / len(st.session_state.answers))
+        
+        status_text.text("Synthesizing Final Decision...")
+        try:
+            st.session_state.final_result = ai_engine.generate_final_result(
+                st.session_state.evaluations, 
+                st.session_state.alerts
+            )
+        except:
+            st.session_state.final_result = {
+                "interview_score": 0, "behavior_score": 100, "risk_level": "LOW", "alerts": [],
+                "final_decision": "REJECTED", "justification": "Synthesis failure."
+            }
         st.session_state.app_state = "REPORT"
+        st.rerun()
 
     @staticmethod
     def generate_pdf(res):
@@ -250,9 +261,10 @@ st.markdown("""
 # --------------------------------------------------
 with st.sidebar:
     st.markdown("### 💎 RECRUITAI **ELITE**")
-    st.caption(f"Audit Session: #{st.session_state.session_id} | v1.2.5")
+    st.caption(f"Audit Session: #{st.session_state.session_id} | v1.3.0")
     st.divider()
     
+    # MASTER CORRECTION: Sidebar Dynamic View
     if st.session_state.app_state == "LANDING":
         st.markdown("#### 👤 Candidate Configuration")
         c_name = st.text_input("Full Name", key="p5_name")
@@ -279,14 +291,16 @@ with st.sidebar:
                 InterviewController.initialize_session(c_name, c_role, c_skills, c_diff, c_count)
                 st.rerun()
     else:
-        st.write(f"**Candidate:** {st.session_state.candidate_info.get('name')}")
+        st.markdown("#### 📡 LIVE SIGNAL TRACE")
+        st.write(f"**Auditing:** {st.session_state.candidate_info.get('name')}")
         st.write(f"**Target:** {st.session_state.candidate_info.get('role')}")
         
-        if st.toggle("Show Forensic Status"):
-            st.write(f"**Integrity:** {len(st.session_state.alerts)} signals")
-            st.write(f"**Progress:** {st.session_state.q_idx + 1}/{len(st.session_state.questions)}")
+        # Visual Progress Pulse
+        prog = (st.session_state.q_idx + 1) / len(st.session_state.questions)
+        st.progress(min(prog, 1.0))
+        st.caption(f"Phase Progress: {int(prog*100)}%")
 
-        if st.button("ABORT SESSION"):
+        if st.button("ABORT SESSION", use_container_width=True):
             st.session_state.clear()
             st.rerun()
 
