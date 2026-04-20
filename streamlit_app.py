@@ -366,11 +366,17 @@ elif st.session_state.app_state == "INTERVIEW":
     if idx < len(st.session_state.questions):
         st.progress((idx + 1) / len(st.session_state.questions))
         
+        # 👨💼 THE REAL INTERVIEW ROOM EXPERIENCE
+        st.markdown("### 👨💼 Interviewer:")
+        st.write("Please answer the following question clearly and confidently.")
+
         # 🎤 AUDIO SYSTEM (PHASE 5 - SAFE MODE)
         st.toggle("🎙️ Enable Audio Mode (Beta)", key="stt_active")
         
         q_text = st.session_state.questions[idx]
         st.markdown(f"<div class='card'><b>AUDIT QUESTION {idx+1}:</b><br>{q_text}</div>", unsafe_allow_html=True)
+        st.caption("💡 Take a moment to think. This simulates a real interview environment.")
+        st.caption("⏱️ Focus on precision. Time is a factor in senior-level audits.")
         
         # Follow-up Injection (Elite Room Feature)
         fu_key = f"fu_{idx}"
@@ -380,7 +386,7 @@ elif st.session_state.app_state == "INTERVIEW":
         existing_ans = st.session_state.answers.get(idx, {}).get("answer", "")
         
         if st.session_state.get("stt_active"):
-            st.warning("🎤 **Audio Transcription Safe Mode Active:** Gemini Audio API is currently restricted in your region. Please type your response below.")
+            st.info("🎤 **Voice input is currently unavailable.** Please type your answer below to continue the interview.")
             ans = st.text_area("Transcript Editor", height=250, key=f"ans_{idx}", value=existing_ans)
         else:
             ans = st.text_area("Technical Response", height=250, key=f"ans_{idx}", value=existing_ans)
