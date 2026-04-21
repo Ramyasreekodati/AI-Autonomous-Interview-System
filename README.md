@@ -1,55 +1,66 @@
-# AI Autonomous Interview System
+# 🚀 RecruitAI: Elite Professional Auditor
+### Autonomous AI Technical Interview & Proctoring System
 
-A state-of-the-art, end-to-end platform for automated technical interviews, featuring real-time AI surveillance, behavioral analysis, and automated scoring.
-
-## 🚀 Overview
-
-This system streamlines the recruitment process by leveraging AI to conduct, monitor, and evaluate interviews. It provides:
-- **AI Proctoring**: Real-time eye tracking, head pose detection, and object detection to ensure interview integrity.
-- **Dynamic Questioning**: Adaptive NLP-driven questions based on candidate responses.
-- **Automated Scoring**: Intelligent grading using NLP and sentiment analysis.
-- **Executive Reporting**: Comprehensive performance dashboards for recruiters.
-
-## 🛠 Tech Stack
-
-- **Backend**: FastAPI (Python), SQLite (SQLAlchemy), JWT Authentication.
-- **Frontend**: React (Vite), Tailwind CSS, Lucide Icons.
-- **AI/ML**: Computer Vision (Proctoring), NLP (Evaluation).
-
-## 📁 Project Structure
-
-```text
-├── backend/            # FastAPI application logic and routers
-├── frontend/           # React + Vite frontend application
-├── .gitignore          # Root ignore file
-└── README.md           # Project documentation
-```
-
-## 🚦 Getting Started
-
-### Prerequisites
-- Python 3.8+
-- Node.js 16+
-
-### Backend Setup
-1. `cd backend`
-2. `python -m venv venv`
-3. `venv\Scripts\activate` (Windows)
-4. `pip install -r requirements.txt`
-5. `uvicorn main:app --reload`
-
-### Frontend Setup
-1. `cd frontend`
-2. `npm install`
-3. `npm run dev`
-
-## 📊 Phase Implementation
-The project was completed in a structured 5-phase approach:
-1. **Core Architecture**: Backend & Frontend foundations.
-2. **AI Integration**: Surveillance and proctoring layers.
-3. **Data Fusion**: Authentication and database persistence.
-4. **Analytics**: Scoring and interview logic.
-5. **Polishing**: Deployment readiness and UX optimization.
+**RecruitAI** is a state-of-the-art, end-to-end platform for automated technical interviews. It leverages the latest multimodal AI (Google Gemini 1.5) to conduct, monitor, and evaluate candidates with human-level precision and enterprise-grade reliability.
 
 ---
-Built with ❤️ by [Kodati Ramya Sree](https://github.com/Ramyasreekodati)
+
+## ✨ Key Features
+
+- **🧠 Intelligent Technical Audit**: Adaptive question generation focused on specific core competencies (Python, AWS, Distributed Systems, etc.).
+- **🎙️ Zero-Fail STT Engine**: Robust Speech-to-Text pipeline with a multimodal cloud bridge, ensuring reliable transcription even without local system dependencies.
+- **🛡️ AI Proctoring & Integrity**: Real-time behavioral surveillance, including gaze tracking, emotion detection, and object detection (phone/book).
+- **📊 Automated Certification**: Comprehensive evaluation reports featuring technical scoring, behavioral risk assessment, and hiring justifications.
+- **💎 Enterprise UI/UX**: Professional, high-visibility "Light-Theme" dashboard designed for recruiters and technical managers.
+
+## 🛠️ Tech Stack
+
+- **Framework**: Streamlit (Production Grade)
+- **AI Core**: Google Gemini 1.5 Flash / Pro (Multimodal)
+- **Transcription**: SpeechRecognition + Pydub + Gemini Multimodal Bridge
+- **Surveillance**: MediaPipe + OpenCV (Computer Vision)
+- **State Management**: Robust Session Persistence
+- **Design**: Professional CSS with custom glassmorphism components
+
+## 🚦 Quick Start
+
+### 1. Prerequisites
+- Python 3.9+
+- A Google Gemini API Key
+
+### 2. Installation
+```bash
+# Clone the repository
+git clone https://github.com/Ramyasreekodati/AI-Autonomous-Interview-System.git
+cd AI-Autonomous-Interview-System
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 3. Configuration
+Create a `.env` file in the root directory:
+```env
+GEMINI_API_KEY=your_api_key_here
+```
+
+### 4. Run the Audit System
+```bash
+streamlit run streamlit_app.py
+```
+
+## 📂 Project Structure
+```text
+├── streamlit_app.py     # Main Entry Point (Auditor Dashboard)
+├── backend/
+│   ├── services/
+│   │   ├── ai_engine.py    # Master AI Logic (STT, Evaluation, Generation)
+│   │   ├── surveillance.py # Computer Vision & Proctoring
+│   │   └── reporting.py    # Analytics & PDF Generation
+├── .env                 # Environment Configuration
+└── requirements.txt     # System Dependencies
+```
+
+---
+Built with ❤️ by **[Kodati Ramya Sree](https://github.com/Ramyasreekodati)**
+*Final Project Submission - Career Success Risk Modeling*

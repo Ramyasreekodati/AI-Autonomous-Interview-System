@@ -2,9 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas
-from services.stt import stt_service
+from services.ai_engine import ai_engine
 from services.scoring import scoring_service
-from services.llm import llm_service
 import os
 import datetime
 from typing import List
@@ -23,14 +22,25 @@ def start_interview(data: schemas.InterviewStart, db: Session = Depends(get_db))
     interview = models.Interview(
         candidate_id=candidate.id, 
         status="ongoing",
+        target_role=data.role,
+        target_skills=", ".join(data.skills) if isinstance(data.skills, list) else data.skills
     )
     db.add(interview)
     db.commit()
     db.refresh(interview)
     
-    # Pre-generate questions for this session to ensure "Navigation Logic" works smoothly
-    for i in range(data.num_questions):
-        q_text = llm_service.generate_question(role=data.role, skills=data.skills, difficulty=data.difficulty)
+    # Pre-generate questions for this session using real AI
+    questions_list = ai_engine.generate_questions(
+        role=data.role, 
+        skills=data.skills, 
+        difficulty=data.difficulty,
+        count=data.num_questions,
+        experience=data.experience,
+        interview_type=data.interview_type,
+        style=data.style
+    )
+    
+    for q_text in questions_list:
         question = models.Question(interview_id=interview.id, text=q_text, category=data.role, difficulty=data.difficulty)
         db.add(question)
     
@@ -68,11 +78,18 @@ def submit_response(interview_id: int, question_id: int, answer_text: str, db: S
         raise HTTPException(status_code=400, detail="Answer is empty or too short.")
     
     # Phase 2: Evaluation Engine (Strictly based on input)
+    interview = db.query(models.Interview).filter(models.Interview.id == interview_id).first()
     question = db.query(models.Question).filter(models.Question.id == question_id).first()
-    if not question:
-        raise HTTPException(status_code=404, detail="Question not found")
+    
+    if not question or not interview:
+        raise HTTPException(status_code=404, detail="Entity not found")
         
-    evaluation = scoring_service.evaluate_response(answer_text, question.text)
+    evaluation = ai_engine.evaluate_answer(
+        question.text, 
+        answer_text, 
+        role=interview.target_role or "Expert",
+        skills=[s.strip() for s in (interview.target_skills or "").split(",")]
+    )
     
     # Phase 1: Unique Answer Storage (update if exists)
     response = db.query(models.Response).filter(
@@ -100,20 +117,28 @@ def submit_response(interview_id: int, question_id: int, answer_text: str, db: S
 
 @router.post("/{interview_id}/submit-audio")
 async def submit_audio_response(interview_id: int, question_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    temp_path = f"temp_{interview_id}_{question_id}_{file.filename}"
-    with open(temp_path, "wb") as buffer:
-        buffer.write(await file.read())
+    # Read audio bytes
+    audio_bytes = await file.read()
     
-    transcription = stt_service.transcribe(temp_path)
-    # os.remove(temp_path) # Optionally keep for debugging
+    # Use real AI for transcription
+    transcription = ai_engine.transcribe_audio(audio_bytes)
     
-    score, sentiment = scoring_service.evaluate_response(transcription, "")
+    # Evaluate the transcribed answer
+    interview = db.query(models.Interview).filter(models.Interview.id == interview_id).first()
+    question = db.query(models.Question).filter(models.Question.id == question_id).first()
+    
+    evaluation = ai_engine.evaluate_answer(
+        question.text if question else "", 
+        transcription,
+        role=interview.target_role if interview else "Expert",
+        skills=[s.strip() for s in (interview.target_skills or "").split(",")] if interview else []
+    )
+    score = evaluation.get("score", 0)
     
     response = models.Response(
         interview_id=interview_id, 
         question_id=question_id, 
         answer_text=transcription,
-        sentiment_score=sentiment,
         relevance_score=score
     )
     db.add(response)

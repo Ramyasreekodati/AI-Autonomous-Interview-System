@@ -31,8 +31,10 @@ class InterviewStart(BaseModel):
     role: str
     skills: List[str]
     difficulty: str
-    num_questions: Optional[int] = 5
+    experience: Optional[str] = "Standard"
     interview_type: Optional[str] = "Technical"
+    style: Optional[str] = "Professional"
+    num_questions: Optional[int] = 5
     audio_mode: Optional[bool] = False
 
 class ResponseCreate(BaseModel):

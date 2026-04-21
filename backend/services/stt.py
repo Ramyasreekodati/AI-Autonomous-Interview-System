@@ -1,18 +1,22 @@
 import os
-import time
+import speech_recognition as sr
 
 class STTService:
     def __init__(self):
-        self._model = None
+        self.recognizer = sr.Recognizer()
 
-    def transcribe(self, audio_data):
+    def transcribe(self, audio_path):
         """
-        LIGHTWEIGHT STT (Cloud Optimized)
-        Currently disabled to keep build size small.
+        PRODUCTION STT ENGINE: High-Reliability File Processing.
         """
-        if audio_data is None:
+        if not audio_path or not os.path.exists(audio_path):
             return ""
 
-        return "Speech-to-Text is currently in 'Safe Mode'. Please type your response below."
+        try:
+            with sr.AudioFile(audio_path) as source:
+                audio_data = self.recognizer.record(source)
+                return self.recognizer.recognize_google(audio_data)
+        except Exception as e:
+            return f"STT Error: {str(e)}"
 
 stt_service = STTService()

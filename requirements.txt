@@ -1,7 +1,12 @@
 google-generativeai
 streamlit
 pandas
-fpdf2
+reportlab
 python-dotenv
 pytest
 streamlit-mic-recorder
+SpeechRecognition
+pydub
+opencv-python
+mediapipe
+numpy

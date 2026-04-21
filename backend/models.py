@@ -20,6 +20,8 @@ class Interview(Base):
     status = Column(String, default="pending")  # pending, ongoing, completed
     total_score = Column(Float, default=0.0)
     risk_level = Column(String, default="low")
+    target_role = Column(String, nullable=True)
+    target_skills = Column(String, nullable=True)
     candidate = relationship("Candidate", back_populates="interviews")
     responses = relationship("Response", back_populates="interview")
     alerts = relationship("Alert", back_populates="interview")

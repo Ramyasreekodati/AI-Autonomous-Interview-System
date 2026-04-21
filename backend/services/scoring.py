@@ -14,68 +14,24 @@ class ScoringService:
             "aws": ["s3", "ec2", "lambda", "cloudwatch", "iam", "rds", "vpc"]
         }
 
-    def evaluate_response(self, answer_text: str, question_text: str):
-        # AUDITOR FIX: Deterministic, non-hallucinating evaluation
-        score = 0
-        matched_keywords = []
-        missing_concepts = []
-        
-        # 1. Basic Validation
-        ans_clean = answer_text.lower().strip()
-        if len(ans_clean) < 10:
+    def evaluate_response(self, answer_text: str, question_text: str, role="Expert", skills=[]):
+        """
+        UPGRADED AI EVALUATOR: Uses Gemini for high-precision technical auditing.
+        """
+        # 1. Immediate Nonsense/Length Filter
+        ans_clean = answer_text.strip()
+        if len(ans_clean) < 15 or len(set(ans_clean)) < 5: # Detect repetitive gibberish
             return {
                 "score": 0,
                 "keywords_matched": [],
-                "missing_concepts": ["Provide a more detailed technical explanation"],
+                "missing_concepts": ["Provide a legitimate technical explanation"],
                 "strengths": [],
-                "weaknesses": ["Answer too short"]
+                "weaknesses": ["Response identified as low-quality or non-technical"]
             }
 
-        # 2. Concept Mapping (Real Intelligence)
-        # Check matching keywords based on the question context
-        q_lower = question_text.lower()
-        active_concepts = []
-        for concept, kw_list in self.concept_keywords.items():
-            if concept in q_lower:
-                active_concepts.extend(kw_list)
-        
-        # If no specific concept detected, use a general pool
-        if not active_concepts:
-            active_concepts = ["implementation", "scalability", "performance", "security", "integrity"]
-
-        for kw in active_concepts:
-            if re.search(r'\b' + re.escape(kw) + r'\b', ans_clean):
-                matched_keywords.append(kw)
-            else:
-                missing_concepts.append(kw)
-
-        # 3. Score Calculation
-        # Length factor (caps at 4 points)
-        len_score = min(4, len(ans_clean) / 100)
-        
-        # Keyword factor (caps at 6 points)
-        kw_score = 0
-        if active_concepts:
-            kw_score = min(6, (len(matched_keywords) / len(active_concepts)) * 10)
-        
-        total_score = round(min(10, len_score + kw_score), 1)
-
-        # 4. Strengths & Weaknesses
-        strengths = []
-        weaknesses = []
-        if total_score > 7: strengths.append("Strong conceptual understanding")
-        if len(ans_clean) > 300: strengths.append("Detailed technical depth")
-        
-        if total_score < 4: weaknesses.append("Lacks technical specifics")
-        if not matched_keywords: weaknesses.append("Missing core industry terminology")
-
-        return {
-            "score": total_score,
-            "keywords_matched": matched_keywords,
-            "missing_concepts": missing_concepts[:3], # Show top 3
-            "strengths": strengths,
-            "weaknesses": weaknesses
-        }
+        # 2. AI Semantic Audit (Connect to Engine)
+        from .ai_engine import ai_engine
+        return ai_engine.evaluate_answer(question_text, answer_text, role, skills)
 
     @staticmethod
     def calculate_unified_score(interview_id, db):

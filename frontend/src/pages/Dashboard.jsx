@@ -22,6 +22,8 @@ const Dashboard = () => {
     role: 'Software Engineer',
     skills: ['Python'],
     difficulty: 'Medium',
+    experience: '3-5 years',
+    style: 'Scenario-Based',
     numQuestions: 5
   });
 
@@ -60,6 +62,8 @@ const Dashboard = () => {
         role: formData.role,
         skills: formData.skills,
         difficulty: formData.difficulty,
+        experience: formData.experience,
+        style: formData.style,
         num_questions: formData.numQuestions
       });
       navigate(`/interview/${response.data.interview_id}`);
@@ -137,10 +141,39 @@ const Dashboard = () => {
                       onChange={(e) => setFormData({...formData, difficulty: e.target.value})}
                     >
                       <option value="Basic">Basic</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Advanced">Advanced</option>
+                      <option value="Standard">Standard</option>
+                      <option value="Elite">Elite</option>
                     </select>
                   </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="input-label">Experience</label>
+                  <select 
+                    className="input-field appearance-none bg-white"
+                    value={formData.experience}
+                    onChange={(e) => setFormData({...formData, experience: e.target.value})}
+                  >
+                    <option value="Fresher">Fresher</option>
+                    <option value="1-3 years">1-3 years</option>
+                    <option value="3-5 years">3-5 years</option>
+                    <option value="5+ years">5+ years</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="input-label">Style</label>
+                  <select 
+                    className="input-field appearance-none bg-white"
+                    value={formData.style}
+                    onChange={(e) => setFormData({...formData, style: e.target.value})}
+                  >
+                    <option value="Conceptual">Conceptual</option>
+                    <option value="Scenario-Based">Scenario-Based</option>
+                    <option value="Coding">Coding</option>
+                    <option value="Mixed">Mixed</option>
+                  </select>
                 </div>
               </div>
 

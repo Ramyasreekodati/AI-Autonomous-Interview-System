@@ -1,7 +1,10 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 import os
+from dotenv import load_dotenv
 from routers import interview, auth
+
+load_dotenv() # Load variables from .env
 from services.surveillance import surveillance
 from database import get_db, engine
 import models

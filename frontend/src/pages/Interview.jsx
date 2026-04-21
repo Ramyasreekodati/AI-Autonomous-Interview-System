@@ -1,16 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Mic, 
   Type, 
   ChevronLeft, 
   ChevronRight, 
-  Send,
   Loader2,
   AlertCircle,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Square,
+  Shield,
+  Eye,
+  Activity
 } from 'lucide-react';
 
 const Interview = () => {
@@ -21,12 +25,32 @@ const Interview = () => {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [questionData, setQuestionData] = useState(null);
   const [answer, setAnswer] = useState("");
-  const [inputMode, setInputMode] = useState("text"); // 'text' or 'audio'
+  const [inputMode, setInputMode] = useState("text");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  
+  // Audio State
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const timerRef = useRef(null);
+
+  // 🛡️ Proctoring State
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [proctoringActive, setProctoringActive] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const [emotion, setEmotion] = useState("Normal");
+  const [gaze, setGaze] = useState("Center");
 
   useEffect(() => {
     fetchQuestion(0);
+    startProctoring();
+    return () => {
+      stopProctoring();
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [id]);
 
   const fetchQuestion = async (index) => {
@@ -43,218 +67,229 @@ const Interview = () => {
       setAnswer(response.data.previous_answer || "");
       setQuestionIndex(index);
     } catch (err) {
-      setError("Failed to load question. Make sure backend is running.");
-      console.error(err);
+      setError("Connectivity issue. Ensure backend is running.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleNext = async () => {
-    if (!answer.trim()) {
-      setError("Please provide an answer before moving to the next question.");
-      return;
-    }
-    
-    setSubmitting(true);
-    setError("");
+  // 🛡️ Proctoring Logic
+  const startProctoring = async () => {
     try {
-      const response = await axios.post(`http://localhost:8000/interview/${id}/submit-response`, null, {
-        params: {
-          question_id: questionData.question_id,
-          answer_text: answer
-        }
-      });
-      
-      if (response.data.status === "invalid") {
-        setError("Invalid input detected. Please provide a meaningful answer.");
-        setSubmitting(false);
-        return;
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setProctoringActive(true);
+        // Start capture loop (every 3 seconds to save bandwidth/quota)
+        const interval = setInterval(captureFrame, 3000);
+        return () => clearInterval(interval);
       }
-
-      setSuccess("Answer saved!");
-      setTimeout(() => {
-        fetchQuestion(questionIndex + 1);
-      }, 500);
     } catch (err) {
-      setError(err.response?.data?.detail || "Submission failed.");
+      console.warn("Camera access denied - Proctoring offline");
+    }
+  };
+
+  const stopProctoring = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+    }
+  };
+
+  const captureFrame = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    
+    canvas.toBlob(async (blob) => {
+      const formData = new FormData();
+      formData.append('file', blob, 'frame.jpg');
+      try {
+        const res = await axios.post(`http://localhost:8000/proctoring/process_frame?interview_id=${id}`, formData);
+        setAlerts(res.data.alerts || []);
+        setEmotion(res.data.emotion || "Normal");
+        setGaze(res.data.gaze || "Center");
+      } catch (err) {
+        console.error("Proctoring sync failed");
+      }
+    }, 'image/jpeg');
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mediaRecorderRef.current.ondataavailable = (e) => audioChunksRef.current.push(e.data);
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        await handleAudioUpload(audioBlob);
+        stream.getTracks().forEach(t => t.stop());
+      };
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      timerRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
+    } catch (err) {
+      setError("Mic error.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      clearInterval(timerRef.current);
+    }
+  };
+
+  const handleAudioUpload = async (blob) => {
+    setSubmitting(true);
+    const formData = new FormData();
+    formData.append('file', blob, 'recording.wav');
+    try {
+      const response = await axios.post(
+        `http://localhost:8000/interview/${id}/submit-audio?question_id=${questionData.question_id}`, 
+        formData
+      );
+      setAnswer(response.data.transcription);
+      setSuccess("Voice transcribed.");
+    } catch (err) {
+      setError("AI Transcription failed.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handlePrevious = () => {
-    if (questionIndex > 0) {
-      fetchQuestion(questionIndex - 1);
+    if (questionIndex > 0) fetchQuestion(questionIndex - 1);
+  };
+
+  const handleNext = async () => {
+    if (!answer.trim()) {
+      setError("Please provide an answer.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await axios.post(`http://localhost:8000/interview/${id}/submit-response`, null, {
+        params: { question_id: questionData.question_id, answer_text: answer }
+      });
+      fetchQuestion(questionIndex + 1);
+    } catch (err) {
+      setError("Submission failed.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-        <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-        <p className="text-gray-500 font-medium">Loading session data...</p>
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">Initializing AI Engine...</div>;
 
   const progress = questionData ? ((questionIndex + 1) / questionData.total) * 100 : 0;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-12 animate-slide-up">
-      {/* Header & Progress */}
-      <div className="mb-12">
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-              Question {questionIndex + 1} of {questionData?.total}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-gray-400 text-sm font-medium">
-            <Clock className="w-4 h-4" />
-            Live Session
-          </div>
-        </div>
-        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-blue-600 transition-all duration-500 ease-out"
-            style={{ width: `${progress}%` }}
-          ></div>
-        </div>
-      </div>
+    <div className="max-w-7xl mx-auto px-6 py-12 text-slate-200">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        
+        {/* MAIN PANEL */}
+        <div className="lg:col-span-3 space-y-8">
+          <div className="bg-slate-900/50 border border-white/10 rounded-3xl p-8 backdrop-blur-xl">
+            <div className="mb-6 flex justify-between items-center">
+              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Question {questionIndex + 1} of {questionData.total}</span>
+              <div className="flex items-center gap-2 text-xs font-medium text-emerald-400">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                Live Audit Active
+              </div>
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-10 leading-snug">{questionData.text}</h1>
+            
+            <div className="space-y-4">
+               <div className="flex items-center gap-4 mb-4">
+                  <button onClick={() => setInputMode("text")} className={`px-4 py-2 rounded-full text-xs font-bold ${inputMode === "text" ? "bg-indigo-500 text-white" : "bg-white/5 text-white/40"}`}>Keyboard</button>
+                  <button onClick={() => setInputMode("audio")} className={`px-4 py-2 rounded-full text-xs font-bold ${inputMode === "audio" ? "bg-indigo-500 text-white" : "bg-white/5 text-white/40"}`}>Voice AI</button>
+               </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Panel: Question & Input */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="premium-card min-h-[500px] flex flex-col">
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold text-gray-900 mb-8 leading-tight">
-                {questionData?.text}
-              </h1>
-
-              {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl flex items-center gap-3 text-sm animate-shake">
-                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                  {error}
-                </div>
-              )}
-
-              {success && (
-                <div className="mb-6 p-4 bg-green-50 border border-green-100 text-green-600 rounded-2xl flex items-center gap-3 text-sm">
-                  <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-                  {success}
-                </div>
-              )}
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="input-label mb-0">Your Response</label>
-                  <div className="flex bg-gray-100 p-1 rounded-xl">
-                    <button 
-                      onClick={() => setInputMode("text")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-                        inputMode === "text" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500"
-                      }`}
-                    >
-                      <Type className="w-3.5 h-3.5" /> Keyboard
-                    </button>
-                    <button 
-                      onClick={() => setInputMode("audio")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-                        inputMode === "audio" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500"
-                      }`}
-                    >
-                      <Mic className="w-3.5 h-3.5" /> Voice
-                    </button>
-                  </div>
-                </div>
-
-                {inputMode === "text" ? (
-                  <textarea
-                    className="input-field min-h-[250px] resize-none p-6 text-lg"
-                    placeholder="Type your detailed answer here..."
+               {inputMode === "text" ? (
+                 <textarea 
+                    className="w-full bg-slate-950/50 border border-white/5 rounded-2xl p-6 text-lg min-h-[300px] outline-none focus:border-indigo-500/50 transition-colors"
+                    placeholder="Type your technical response here..."
                     value={answer}
                     onChange={(e) => setAnswer(e.target.value)}
-                  ></textarea>
-                ) : (
-                  <div className="min-h-[250px] flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50 p-10">
-                    <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-6 cursor-pointer hover:bg-blue-200 transition-colors group">
-                      <Mic className="text-blue-600 w-8 h-8 group-active:scale-90 transition-transform" />
-                    </div>
-                    <p className="text-gray-500 font-medium">Click to Start Recording</p>
-                    <p className="text-xs text-gray-400 mt-2">Phase 1: Recording UI Only</p>
-                  </div>
-                )}
-              </div>
+                 />
+               ) : (
+                 <div className="h-[300px] bg-slate-950/50 border border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center">
+                    <button 
+                      onClick={isRecording ? stopRecording : startRecording}
+                      className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${isRecording ? "bg-red-500/20 border-red-500" : "bg-indigo-500/20 border-indigo-500"} border`}
+                    >
+                      {isRecording ? <Square className="fill-red-500 text-red-500" /> : <Mic className="text-indigo-500" />}
+                    </button>
+                    <p className="mt-4 font-bold">{isRecording ? "Recording..." : "Click to Speak"}</p>
+                 </div>
+               )}
             </div>
 
-            {/* Navigation */}
-            <div className="mt-12 flex justify-between items-center bg-gray-50 -mx-10 -mb-10 p-6 px-10 rounded-b-[20px] border-t border-gray-100">
-              <button 
-                onClick={handlePrevious}
-                disabled={questionIndex === 0 || submitting}
-                className="btn-secondary flex items-center gap-2 disabled:opacity-30"
-              >
-                <ChevronLeft className="w-5 h-5" /> Previous
-              </button>
-              
-              <button 
-                onClick={handleNext}
-                disabled={submitting}
-                className="btn-primary min-w-[140px]"
-              >
-                {submitting ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    {questionIndex + 1 === questionData?.total ? "Finish" : "Next Question"}
-                    <ChevronRight className="w-5 h-5" />
-                  </>
-                )}
+            <div className="mt-10 flex justify-between">
+              <button onClick={handlePrevious} disabled={questionIndex === 0} className="px-6 py-3 text-white/40 font-bold hover:text-white disabled:opacity-0 transition-colors flex items-center gap-2"><ChevronLeft /> Back</button>
+              <button onClick={handleNext} disabled={submitting} className="px-8 py-3 bg-indigo-600 rounded-xl font-bold text-white hover:bg-indigo-500 transition-colors flex items-center gap-2">
+                {submitting ? <Loader2 className="animate-spin" /> : "Commit & Continue"} <ChevronRight />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Side Panel: Info */}
+        {/* PROCTORING SIDEBAR */}
         <div className="space-y-6">
-          <div className="premium-card">
-            <h3 className="font-bold text-gray-900 mb-4">Interview Guidelines</h3>
-            <ul className="space-y-4">
-              <li className="flex gap-3 text-sm text-gray-500">
-                <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 font-bold text-[10px]">1</div>
-                Be as descriptive as possible in your technical explanations.
-              </li>
-              <li className="flex gap-3 text-sm text-gray-500">
-                <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 font-bold text-[10px]">2</div>
-                Focus on core concepts and best practices.
-              </li>
-              <li className="flex gap-3 text-sm text-gray-500">
-                <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 font-bold text-[10px]">3</div>
-                Answers are saved automatically as you move between questions.
-              </li>
-            </ul>
+          <div className="bg-slate-900/50 border border-white/10 rounded-3xl p-6 backdrop-blur-xl">
+            <div className="flex items-center gap-2 mb-4">
+              <Shield className="text-indigo-400 w-4 h-4" />
+              <h3 className="font-bold text-sm uppercase tracking-widest text-white">Surveillance</h3>
+            </div>
+            
+            <div className="aspect-video bg-black rounded-xl mb-4 overflow-hidden relative">
+              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover grayscale" />
+              <canvas ref={canvasRef} className="hidden" />
+              <div className="absolute top-2 right-2 bg-red-500 text-[8px] font-black px-1.5 py-0.5 rounded animate-pulse">REC</div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                <p className="text-[8px] font-bold text-white/40 uppercase mb-1">Emotion</p>
+                <p className="text-xs font-bold text-white">{emotion}</p>
+              </div>
+              <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                <p className="text-[8px] font-bold text-white/40 uppercase mb-1">Gaze</p>
+                <p className="text-xs font-bold text-white">{gaze}</p>
+              </div>
+            </div>
+
+            {alerts.length > 0 && (
+              <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl">
+                <p className="text-[10px] font-bold text-red-400 flex items-center gap-2">
+                   <AlertCircle className="w-3 h-3" /> Security Alert Detected
+                </p>
+              </div>
+            )}
           </div>
 
-          <div className="premium-card bg-gradient-to-br from-gray-900 to-slate-800 text-white border-none shadow-xl">
-            <h3 className="font-bold mb-2 flex items-center gap-2">
-              <AlertCircle className="text-yellow-400 w-4 h-4" />
-              Proctoring Status
-            </h3>
-            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-              Real-time monitoring is disabled for Phase 1. Complete this stage to unlock AI Surveillance.
-            </p>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-[10px] uppercase font-bold tracking-widest text-slate-500">
-                <span>Phase Progress</span>
-                <span>25%</span>
+          <div className="bg-slate-900/50 border border-white/10 rounded-3xl p-6 backdrop-blur-xl">
+             <div className="flex items-center gap-2 mb-4">
+              <Activity className="text-indigo-400 w-4 h-4" />
+              <h3 className="font-bold text-sm uppercase tracking-widest text-white">Metrics</h3>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-[10px] font-bold text-white/40">
+                <span>PROGRESS</span>
+                <span>{Math.round(progress)}%</span>
               </div>
-              <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 w-1/4"></div>
+              <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                <div className="h-full bg-indigo-500 transition-all duration-500" style={{width: `${progress}%`}}></div>
               </div>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );
