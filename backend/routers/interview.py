@@ -121,7 +121,7 @@ async def submit_audio_response(interview_id: int, question_id: int, file: Uploa
     audio_bytes = await file.read()
     
     # Use real AI for transcription
-    transcription = ai_engine.transcribe_audio(audio_bytes)
+    transcription = ai_engine.transcribe_bytes(audio_bytes)
     
     # Evaluate the transcribed answer
     interview = db.query(models.Interview).filter(models.Interview.id == interview_id).first()

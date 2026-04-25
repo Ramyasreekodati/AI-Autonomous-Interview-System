@@ -77,6 +77,21 @@ const Dashboard = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 animate-slide-up">
+      <div className="flex justify-between items-center mb-8 bg-gradient-to-r from-blue-600/5 to-purple-600/5 p-6 rounded-3xl border border-white">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Main Dashboard</h2>
+          <p className="text-sm text-gray-500">Core assessment system 1.0</p>
+        </div>
+        <button 
+          onClick={() => navigate('/elite/dashboard')}
+          className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 hover:bg-slate-800 transition-all shadow-xl shadow-slate-200"
+        >
+          <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          Try Elite AI V2
+          <ChevronRight size={18} />
+        </button>
+      </div>
+      
       <div className="flex flex-col md:flex-row gap-8">
         
         {/* Left Panel: Configuration */}

@@ -53,6 +53,29 @@ def get_db_sync():
             db.close()
     return None
 
+import requests
+
+# 🛡️ ARCHITECT FIX: UI → API Gateway Bridge
+API_BASE_URL = "http://localhost:8000/interview"
+
+def call_api(endpoint, data=None, method="POST"):
+    """
+    Production-grade REST bridge to FastAPI backend.
+    """
+    try:
+        url = f"{API_BASE_URL.replace('/interview', '')}/{endpoint}" if "/" not in endpoint else f"http://localhost:8000{endpoint}"
+        if method == "POST":
+            response = requests.post(url, json=data, timeout=10)
+        else:
+            response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except Exception as e:
+        st.error(f"📡 API Connection Error: {str(e)}")
+        return None
+
 # Load Environment Variables
 load_dotenv()
 
@@ -71,6 +94,8 @@ def init_state():
         st.session_state.evaluations = {}
     if "q_idx" not in st.session_state:
         st.session_state.q_idx = 0
+    if "question_ids" not in st.session_state:
+        st.session_state.question_ids = []
     if "logs" not in st.session_state:
         st.session_state.logs = []
     if "alerts" not in st.session_state:
@@ -99,52 +124,58 @@ class InterviewController:
         
         with st.spinner("Initializing Professional Audit Core..."):
             try:
-                # 🛡️ PERSISTENCE FIX: Save session to DB
-                db = get_db_sync()
-                interview_id = None
-                if db and models:
-                    candidate = db.query(models.Candidate).filter(models.Candidate.email == email).first()
-                    if not candidate:
-                        candidate = models.Candidate(name=name, email=email)
-                        db.add(candidate)
-                        db.commit()
-                        db.refresh(candidate)
-                    
-                    interview = models.Interview(
-                        candidate_id=candidate.id,
-                        status="ongoing",
-                        target_role=role,
-                        target_skills=", ".join(skills.split(",")) if isinstance(skills, str) else skills
-                    )
-                    db.add(interview)
-                    db.commit()
-                    db.refresh(interview)
-                    interview_id = interview.id
-                    st.session_state.active_interview_id = interview_id
-                
-                questions = ai_engine.generate_questions(
-                    role, skills, diff, count, exp, i_type, style
-                )
-                
-                # 🔴 FIX 2: Validate AI Output & Ensure Count
-                if not isinstance(questions, list) or len(questions) < count:
-                    questions = [
-                        f"Technical question for {role}: Explain a key challenge you've faced with {skills} (Part {i+1})"
-                        for i in range(count)
-                    ]
-                
-                # Save questions to DB if possible
-                if db and interview_id:
-                    for q_text in questions[:count]:
-                        db_q = models.Question(interview_id=interview_id, text=q_text, category=role, difficulty=diff)
-                        db.add(db_q)
-                    db.commit()
-                
-                if db: db.close()
+                skills_list = [s.strip() for s in skills.split(",")]
 
-                st.session_state.questions = questions[:count]
+                api_res = call_api("/interview/start", {
+                    "candidate_name": name,
+                    "candidate_email": email,
+                    "role": role,
+                    "skills": skills_list,
+                    "difficulty": diff,
+                    "num_questions": count,
+                    "experience": exp,
+                    "interview_type": i_type,
+                    "style": style
+                })
+
+                interview_id = api_res.get("interview_id") if api_res else None
+                if interview_id:
+                    st.session_state.active_interview_id = interview_id
+
+                # Fetch questions from DB (the API stored them there)
+                fetched_questions = []
+                if interview_id:
+                    for i in range(count):
+                        q_res = call_api(f"/interview/{interview_id}/question/{i}", method="GET")
+                        if q_res and not q_res.get("finished"):
+                            fetched_questions.append({
+                                "text": q_res["text"],
+                                "db_id": q_res["question_id"]
+                            })
+
+                if fetched_questions:
+                    st.session_state.questions     = [q["text"] for q in fetched_questions]
+                    st.session_state.question_ids  = [q["db_id"] for q in fetched_questions]
+                    log_event("session_start", f"Loaded {len(fetched_questions)} questions from DB for {name}")
+                else:
+                    # Fallback: generate locally if API unreachable
+                    if ai_engine:
+                        local_qs = ai_engine.generate_questions(
+                            role=role, skills=skills, difficulty=diff,
+                            count=count, experience=exp,
+                            interview_type=i_type, style=style
+                        )
+                        st.session_state.questions = local_qs or [
+                            f"Explain a key concept in {role} related to {skills} (Part {i+1})" for i in range(count)
+                        ]
+                    else:
+                        st.session_state.questions = [
+                            f"Explain a key concept in {role} related to {skills} (Part {i+1})" for i in range(count)
+                        ]
+                    st.session_state.question_ids = list(range(len(st.session_state.questions)))
+                    log_event("session_start", f"API offline — questions generated locally for {name}")
+
                 st.session_state.app_state = "INTERVIEW"
-                log_event("session_start", f"Audit initialized for {name} (ID: {interview_id})")
                 st.rerun()
             except Exception as e:
                 st.error(f"System Failure: {str(e)}")
@@ -152,43 +183,26 @@ class InterviewController:
     @staticmethod
     def commit_answer(idx, q_text, ans):
         if not ans or len(ans.strip()) < 10:
-            st.warning("⚠️ Response is too brief. Please provide a detailed technical explanation.")
+            st.warning("Response is too brief (minimum 10 characters).")
             return False
-        
-        # 🛡️ PERSISTENCE FIX: Save response to DB
-        db = get_db_sync()
-        if db and models and "active_interview_id" in st.session_state:
-            interview_id = st.session_state.active_interview_id
-            # Find question_id
-            question = db.query(models.Question).filter(
-                models.Question.interview_id == interview_id,
-                models.Question.text == q_text
-            ).first()
-            
-            if question:
-                response = db.query(models.Response).filter(
-                    models.Response.interview_id == interview_id,
-                    models.Response.question_id == question.id
-                ).first()
-                
-                if response:
-                    response.answer_text = ans
-                else:
-                    response = models.Response(
-                        interview_id=interview_id,
-                        question_id=question.id,
-                        answer_text=ans
-                    )
-                    db.add(response)
-                db.commit()
-        if db: db.close()
+
+        # Submit to API with the real DB question_id if available
+        interview_id  = st.session_state.get("active_interview_id")
+        question_ids  = st.session_state.get("question_ids", [])
+        db_question_id = question_ids[idx] if idx < len(question_ids) else idx + 1
+
+        if interview_id:
+            call_api(
+                f"/interview/{interview_id}/submit-response",
+                {"question_id": db_question_id, "answer_text": ans}
+            )
 
         st.session_state.answers[idx] = {
             "question": q_text,
             "answer": ans,
             "timestamp": time.time()
         }
-        log_event("answer_commit", f"Committed response for Unit {idx+1}")
+        log_event("answer_commit", f"Response committed for Q{idx+1}")
         return True
 
     @staticmethod
@@ -208,63 +222,51 @@ class InterviewController:
         progress_bar = st.progress(0)
         
         total = len(st.session_state.questions)
-        info = st.session_state.candidate_info
-        
-        # 🛡️ PERSISTENCE FIX: Finalize in DB
-        db = get_db_sync()
         interview_id = st.session_state.get("active_interview_id")
-        
+
+        info = st.session_state.candidate_info
+
         for q_id in range(total):
-            # Dynamic status update
-            phase_idx = min(q_id, len(phases)-1)
-            status_placeholder.markdown(f"#### {phases[phase_idx]}")
-            
+            phase_idx = min(q_id, len(phases) - 1)
+            status_placeholder.markdown(f"#### {phases[phase_idx]} (Q{q_id+1}/{total})")
+
             data = st.session_state.answers.get(q_id)
-            if not data:
-                eval_res = {"score": 0, "strengths": [], "weaknesses": ["Skipped"]}
+            if data and data.get("answer") and ai_engine:
+                # REAL per-question evaluation
+                eval_res = ai_engine.evaluate_answer(
+                    question=data["question"],
+                    answer=data["answer"],
+                    role=info.get("role", "Expert"),
+                    skills=info.get("skills", [])
+                )
                 st.session_state.evaluations[q_id] = eval_res
-            else:
-                try:
-                    eval_res = ai_engine.evaluate_answer(
-                        data["question"], data["answer"], role=info["role"], skills=info["skills"]
-                    )
-                    st.session_state.evaluations[q_id] = eval_res
-                    
-                    # Update DB with score
-                    if db and models and interview_id:
-                        response = db.query(models.Response).join(models.Question).filter(
-                            models.Response.interview_id == interview_id,
-                            models.Question.text == data["question"]
-                        ).first()
-                        if response:
-                            response.relevance_score = eval_res["score"]
-                except Exception as e:
-                    st.session_state.evaluations[q_id] = {"score": 0, "strengths": [], "weaknesses": ["System Error"]}
-            
+            elif data and data.get("answer"):
+                # Local heuristic fallback
+                words = len(data["answer"].split())
+                st.session_state.evaluations[q_id] = {
+                    "score": min(10, max(2, words // 15)),
+                    "strengths": ["Response provided"],
+                    "weaknesses": ["AI evaluation unavailable — local scoring applied"],
+                    "sentiment": {"confidence": min(100, words * 4), "clarity": 70}
+                }
+
             progress_bar.progress((q_id + 1) / total)
-            time.sleep(0.5) 
-            
-        if db and interview_id:
-            db.commit()
-        
-        status_placeholder.markdown(f"#### {phases[-1]}")
+            time.sleep(0.4)
+
+        # Generate final summary report
         try:
-            report_data = ai_engine.generate_final_result(st.session_state.evaluations, st.session_state.alerts)
+            report_data = ai_engine.generate_final_result(
+                st.session_state.evaluations, st.session_state.alerts
+            )
             st.session_state.final_report = report_data
-            
-            # Close Interview in DB
-            if db and interview_id:
-                interview = db.query(models.Interview).filter(models.Interview.id == interview_id).first()
-                if interview:
-                    interview.status = "completed"
-                db.commit()
-                
-            st.session_state.app_state = "REPORT"
-            log_event("audit_finalize", "High-fidelity report generated.")
         except Exception as e:
-            st.error(f"Final synthesis failed: {str(e)}")
+            st.session_state.final_report = {
+                "interview_score": 0, "behavior_score": 0, "final_aggregate_score": 0,
+                "final_decision": "AUDIT ERROR", "justification": f"Synthesis failed: {str(e)}"
+            }
         
-        if db: db.close()
+        st.session_state.app_state = "REPORT"
+        log_event("audit_finalize", "High-fidelity report generated.")
         st.rerun()
 
 # --------------------------------------------------
@@ -275,70 +277,92 @@ init_state()
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
-    .stApp {
-        background-color: #f8fafc;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+    html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
     }
 
-    .block-container {
-        padding: 3rem 5rem !important;
-        max-width: 1200px;
+    /* ── ANIMATIONS ── */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
     }
+    @keyframes pulseGlow {
+        0% { box-shadow: 0 0 5px rgba(79,70,229,0.2); }
+        50% { box-shadow: 0 0 20px rgba(79,70,229,0.5); }
+        100% { box-shadow: 0 0 5px rgba(79,70,229,0.2); }
+    }
+    .fade-in { animation: fadeIn 0.6s ease-out forwards; }
 
-    /* Professional Card Styling */
+    /* ── GLASSMORPHISM CARD ── */
     .prof-card {
-        background: white;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
         padding: 2rem;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        margin-bottom: 2rem;
-    }
-
-    h1, h2, h3 {
-        color: #0f172a;
-        font-weight: 700;
-    }
-
-    .header-text {
-        color: #64748b;
-        font-size: 1.1rem;
-        margin-bottom: 2.5rem;
-    }
-
-    /* Form & Input Styling */
-    .stTextInput input, .stTextArea textarea, .stSelectbox [data-baseweb="select"], .stNumberInput input {
-        background-color: white !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 8px !important;
-        color: #1e293b !important;
-        padding: 0.75rem !important;
-    }
-
-    .stTextInput input:focus {
-        border-color: #6366f1 !important;
-        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1) !important;
-    }
-
-    /* Buttons */
-    .stButton>button {
-        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%) !important;
-        color: white !important;
-        border-radius: 8px !important;
-        padding: 0.8rem 2rem !important;
-        font-weight: 600 !important;
-        letter-spacing: 0.025em;
-        border: none !important;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        margin-bottom: 1.5rem;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
         transition: all 0.3s ease;
-        box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+    }
+    .prof-card:hover { 
+        transform: translateY(-2px);
+        border-color: rgba(99, 102, 241, 0.3);
     }
 
+    /* ── QUESTION CARD ── */
+    .question-card {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        padding: 2.5rem;
+        border-radius: 20px;
+        margin-bottom: 1.5rem;
+        color: white;
+        position: relative;
+        overflow: hidden;
+        animation: pulseGlow 4s infinite ease-in-out;
+    }
+    .question-card::before {
+        content: '';
+        position: absolute; top: -50px; right: -50px;
+        width: 200px; height: 200px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 50%;
+    }
+
+    /* ── PULSE INDICATOR ── */
+    .pulse-dot {
+        height: 8px; width: 8px;
+        background-color: #10b981;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+        box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
+        animation: pulseDot 2s infinite;
+    }
+    @keyframes pulseDot {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* ── SIDEBAR BRANDING ── */
+    [data-testid="stSidebar"] {
+        background-image: linear-gradient(180deg, rgba(79,70,229,0.05) 0%, rgba(255,255,255,0) 100%);
+    }
+
+    /* ── BUTTONS ── */
+    .stButton>button {
+        background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
+        color: white !important; border-radius: 12px !important;
+        padding: 0.8rem 2.2rem !important; border: none !important;
+        font-weight: 600 !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
     .stButton>button:hover {
-        background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%) !important;
-        transform: translateY(-2px);
-        box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+        letter-spacing: 0.5px !important;
+        filter: brightness(1.1);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -349,7 +373,7 @@ st.markdown("""
 
 with st.sidebar:
     st.markdown("<h2 style='color: #4f46e5; margin-bottom: 0;'>RecruitAI</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #64748b; font-size: 0.8rem; margin-top: 0;'>ELITE AUDITOR v2.0</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #64748b; font-size: 0.8rem; margin-top: 0; font-weight: 600; letter-spacing: 1px;'>ELITE AUDITOR v3.0</p>", unsafe_allow_html=True)
     st.divider()
     if st.session_state.app_state != "DASHBOARD":
         st.markdown("### 🛠 Audit Control")
@@ -358,8 +382,14 @@ with st.sidebar:
             st.rerun()
 
 if st.session_state.app_state == "DASHBOARD":
-    st.markdown("<h1>Professional Audit Center</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='header-text'>Secure, High-Precision Technical Talent Evaluation</p>", unsafe_allow_html=True)
+    engine_mode = "AI Core Active" if (ai_engine and ai_engine.model) else "Local Engine Active"
+    st.markdown(
+        f"<div class='fade-in'>"
+        f"<h1 style='margin-bottom:0.3rem;'>Autonomous Interview System</h1>"
+        f"<p class='header-text'><span class='pulse-dot'></span>{engine_mode} &nbsp;|&nbsp; Precision Audit v3.0</p>"
+        f"</div>",
+        unsafe_allow_html=True
+    )
     
     col_l, col_r = st.columns([2, 1])
     
@@ -396,28 +426,37 @@ if st.session_state.app_state == "DASHBOARD":
 
     with col_r:
         st.markdown("<div class='prof-card'>", unsafe_allow_html=True)
-        st.markdown("### 🏥 System Status")
-        
-        st.markdown("""
-        <div style='margin-bottom: 15px;'>
-            <span style='color: #64748b; font-size: 0.9rem;'>AI Engine:</span>
-            <span class='status-pill' style='background: #f0fdf4; color: #16a34a; border-color: #bbf7d0;'>ACTIVE</span>
-        </div>
-        <div style='margin-bottom: 25px;'>
-            <span style='color: #64748b; font-size: 0.9rem;'>Proctoring:</span>
-            <span class='status-pill' style='background: #f0fdf4; color: #16a34a; border-color: #bbf7d0;'>ONLINE</span>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        m1, m2 = st.columns(2)
-        m1.metric("Confidence", "99%")
-        m2.metric("Latency", "240ms")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("#### 📖 Recent Activity")
+        st.markdown("### System Status")
+
+        ai_ok  = ai_engine and ai_engine.model
+        proc_ok = surveillance is not None
+        stt_ok  = True  # Always available via browser
+
+        def _pill(label, ok, local_label=None):
+            if ok:
+                return f"<span class='status-pill pill-online'>{label}: ONLINE</span>"
+            elif local_label:
+                return f"<span class='status-pill pill-local'>{label}: {local_label}</span>"
+            else:
+                return f"<span class='status-pill pill-offline'>{label}: OFFLINE</span>"
+
+        st.markdown(
+            f"<div style='display:flex;flex-direction:column;gap:10px;margin-bottom:1.5rem;'>"
+            f"{_pill('AI Engine', ai_ok, 'LOCAL')}"
+            f"{_pill('Proctoring', proc_ok, 'DISABLED')}"
+            f"{_pill('Voice STT', stt_ok)}"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+        st.markdown("#### Recent Activity")
         if st.session_state.logs:
             for log in reversed(st.session_state.logs[-5:]):
-                st.markdown(f"<div style='font-size: 0.85rem; color: #64748b; margin-bottom: 5px;'><b>[{log['timestamp']}]</b> {log['message']}</div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"<div style='font-size:0.8rem;color:#64748b;margin-bottom:6px;'>"
+                    f"<b>[{log['timestamp']}]</b> {log['message']}</div>",
+                    unsafe_allow_html=True
+                )
         else:
             st.caption("Awaiting session start...")
         st.markdown("</div>", unsafe_allow_html=True)
@@ -436,83 +475,208 @@ elif st.session_state.app_state == "INTERVIEW":
     
     with col_main:
         st.markdown(f"""
-        <div class='prof-card' style='border-left: 5px solid #4f46e5; background: #fcfdff;'>
-            <p style='color: #4f46e5; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 0.5rem;'>Technical Challenge {idx+1}</p>
-            <h3 style='margin-top: 0; line-height: 1.4; font-size: 1.5rem;'>{q_text}</h3>
+        <div class='question-card'>
+            <div class='q-label'>Question {idx+1} of {len(st.session_state.questions)} &nbsp;&bull;&nbsp; {info['role']}</div>
+            <h3>{q_text}</h3>
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("<div class='prof-card'>", unsafe_allow_html=True)
-        st.markdown("#### 🎙️ Voice Response")
+        # ============================================================
+        # 🎙️ BROWSER-NATIVE SPEECH-TO-TEXT (No API Key Required)
+        # Uses Chrome's built-in SpeechRecognition engine — FREE & Fast
+        # ============================================================
         
-        if mic_recorder:
-            audio = mic_recorder(
-                start_prompt="🎤 START RECORDING", 
-                stop_prompt="⏹️ STOP & TRANSCRIBE", 
-                key=f"mic_{idx}"
-            )
-            
-            # 🔴 FIX 1 & 3: Reliable validation and state flag
-            if audio and audio.get('bytes'):
-                audio_id = audio.get('id', hash(audio['bytes']))
-                if st.session_state.get(f"last_proc_{idx}") != audio_id:
-                    with st.spinner("🧬 Converting & Transcribing..."):
-                        webm_path = None
-                        wav_path = None
-                        try:
-                            from pydub import AudioSegment
-                            import tempfile
-                            
-                            # 1. Save raw capture (WebM)
-                            with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
-                                tmp.write(audio['bytes'])
-                                webm_path = tmp.name
-                            
-                            # 2. Convert to WAV (PCM)
-                            wav_path = webm_path.replace(".webm", ".wav")
-                            audio_seg = AudioSegment.from_file(webm_path, format="webm")
-                            audio_seg.export(wav_path, format="wav")
-                            
-                            # 3. Transcribe
-                            transcription = ai_engine.transcribe_audio(wav_path)
-                            if not transcription:
-                                # Fallback to bytes transcription if WAV fails
-                                transcription = ai_engine.transcribe_bytes(audio['bytes'], mime_type="audio/webm")
-                                
-                            if transcription:
-                                st.session_state[f"ans_{idx}"] = transcription
-                                st.session_state[f"last_proc_{idx}"] = audio_id
-                                log_event("audio_proc", f"Voice data processed for Q{idx+1}")
-                                st.rerun()
-                            else:
-                                st.warning("🔇 No speech detected. Please speak closer to the microphone and try again.")
-                                
-                        except Exception:
-                            # 🛡️ SILENT PRODUCTION FALLBACK: If FFmpeg is missing, quietly use Gemini
-                            transcription = ai_engine.transcribe_bytes(audio['bytes'], mime_type="audio/webm")
-                            if transcription:
-                                st.session_state[f"ans_{idx}"] = transcription
-                                st.session_state[f"last_proc_{idx}"] = audio_id
-                                st.toast("✅ Voice captured successfully!", icon="🎙️")
-                                st.rerun()
-                            else:
-                                st.error("❌ Transcription Sync Error. Please try again or type your response.")
-                                st.caption("💡 Tip: For the best experience, ensure your browser has microphone permissions enabled.")
-                        finally:
-                            import time
-                            time.sleep(0.5) # 🛡️ WINDOWS FIX: Allow file handles to release
-                            for p in [webm_path, wav_path]:
-                                if p and os.path.exists(p):
-                                    try:
-                                        os.remove(p)
-                                    except:
-                                        pass
-        else:
-            st.warning("Audio recorder component is not available.")
+        # Bridge: a hidden text input that JavaScript will populate
+        stt_bridge_key = f"stt_bridge_{idx}"
+        if stt_bridge_key not in st.session_state:
+            st.session_state[stt_bridge_key] = ""
 
-        existing_ans = st.session_state.get(f"ans_{idx}", st.session_state.answers.get(idx, {}).get("answer", ""))
-        ans = st.text_area("Final Technical Response", value=existing_ans, height=200, key=f"text_{idx}")
-        st.session_state[f"ans_{idx}"] = ans
+        import streamlit.components.v1 as components
+
+        stt_html = f"""
+        <div style="font-family: 'Inter', sans-serif;">
+            <button id="sttBtn_{idx}" onclick="toggleRecording_{idx}()" 
+                style="
+                    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+                    color: white;
+                    border: none;
+                    padding: 10px 24px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    transition: all 0.2s;
+                    box-shadow: 0 4px 12px rgba(79,70,229,0.3);
+                ">
+                🎤 START RECORDING
+            </button>
+            <div id="sttStatus_{idx}" style="margin-top:10px; font-size:13px; color:#64748b; min-height:20px;"></div>
+            <div id="sttResult_{idx}" style="
+                margin-top:10px; padding:12px; 
+                background:#f8fafc; border:1px solid #e2e8f0; 
+                border-radius:8px; font-size:14px; 
+                color:#1e293b; min-height:40px; display:none;
+            "></div>
+            <button id="sttApply_{idx}" onclick="applyTranscript_{idx}()" style="
+                display:none; margin-top:10px;
+                background:#10b981; color:white; border:none;
+                padding:8px 20px; border-radius:6px;
+                font-size:13px; font-weight:600; cursor:pointer;
+            ">✅ USE THIS TEXT</button>
+        </div>
+
+        <script>
+        var recognition_{idx} = null;
+        var isRecording_{idx} = false;
+        var finalTranscript_{idx} = '';
+
+        function toggleRecording_{idx}() {{
+            if (isRecording_{idx}) {{
+                stopRecording_{idx}();
+            }} else {{
+                startRecording_{idx}();
+            }}
+        }}
+
+        function startRecording_{idx}() {{
+            var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {{
+                document.getElementById('sttStatus_{idx}').innerHTML = 
+                    '⚠️ Speech recognition not supported. Please use Chrome browser.';
+                return;
+            }}
+
+            recognition_{idx} = new SpeechRecognition();
+            recognition_{idx}.continuous = true;
+            recognition_{idx}.interimResults = true;
+            recognition_{idx}.lang = 'en-US';
+            finalTranscript_{idx} = '';
+
+            recognition_{idx}.onstart = function() {{
+                isRecording_{idx} = true;
+                var btn = document.getElementById('sttBtn_{idx}');
+                btn.innerHTML = '⏹️ STOP RECORDING';
+                btn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+                btn.style.boxShadow = '0 4px 12px rgba(239,68,68,0.4)';
+                document.getElementById('sttStatus_{idx}').innerHTML = 
+                    '<span style="color:#ef4444;">🔴 Recording... Speak now</span>';
+                document.getElementById('sttResult_{idx}').style.display = 'none';
+                document.getElementById('sttApply_{idx}').style.display = 'none';
+            }};
+
+            recognition_{idx}.onresult = function(event) {{
+                var interimTranscript = '';
+                for (var i = event.resultIndex; i < event.results.length; i++) {{
+                    if (event.results[i].isFinal) {{
+                        finalTranscript_{idx} += event.results[i][0].transcript + ' ';
+                    }} else {{
+                        interimTranscript += event.results[i][0].transcript;
+                    }}
+                }}
+                var display = finalTranscript_{idx} + 
+                    '<span style="color:#94a3b8;">' + interimTranscript + '</span>';
+                document.getElementById('sttResult_{idx}').innerHTML = display;
+                document.getElementById('sttResult_{idx}').style.display = 'block';
+            }};
+
+            recognition_{idx}.onerror = function(event) {{
+                document.getElementById('sttStatus_{idx}').innerHTML = 
+                    '⚠️ Mic error: ' + event.error + '. Check browser mic permissions.';
+                stopRecording_{idx}();
+            }};
+
+            recognition_{idx}.onend = function() {{
+                if (isRecording_{idx}) {{
+                    // Auto-restart for continuous recording
+                    recognition_{idx}.start();
+                }}
+            }};
+
+            recognition_{idx}.start();
+        }}
+
+        function stopRecording_{idx}() {{
+            isRecording_{idx} = false;
+            if (recognition_{idx}) recognition_{idx}.stop();
+            var btn = document.getElementById('sttBtn_{idx}');
+            btn.innerHTML = '🎤 START RECORDING';
+            btn.style.background = 'linear-gradient(135deg, #4f46e5, #7c3aed)';
+            btn.style.boxShadow = '0 4px 12px rgba(79,70,229,0.3)';
+            
+            if (finalTranscript_{idx}.trim()) {{
+                document.getElementById('sttStatus_{idx}').innerHTML = 
+                    '✅ Transcription complete! Click "USE THIS TEXT" to apply.';
+                document.getElementById('sttApply_{idx}').style.display = 'inline-block';
+            }} else {{
+                document.getElementById('sttStatus_{idx}').innerHTML = 
+                    '🔇 No speech detected. Try again.';
+            }}
+        }}
+
+        function applyTranscript_{idx}() {{
+            var text = finalTranscript_{idx}.trim();
+            if (!text) return;
+            
+            // Write to the dedicated Python bridge input (identified by placeholder)
+            var inputs = window.parent.document.querySelectorAll('input[type="text"]');
+            var bridgeInput = null;
+            for (var i = 0; i < inputs.length; i++) {{
+                if (inputs[i].placeholder && inputs[i].placeholder.indexOf('transcript will appear') !== -1) {{
+                    bridgeInput = inputs[i];
+                    break;
+                }}
+            }}
+            
+            if (bridgeInput) {{
+                var nativeSetter = Object.getOwnPropertyDescriptor(
+                    window.parent.HTMLInputElement.prototype, 'value').set;
+                nativeSetter.call(bridgeInput, text);
+                bridgeInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                document.getElementById('sttStatus_{idx}').innerHTML = 
+                    '🎯 Text ready! Click the "Apply Voice to Answer" button below.';
+            }} else {{
+                // Fallback: fill any visible textarea
+                var textareas = window.parent.document.querySelectorAll('textarea');
+                if (textareas.length > 0) {{
+                    var nativeSetter2 = Object.getOwnPropertyDescriptor(
+                        window.parent.HTMLTextAreaElement.prototype, 'value').set;
+                    nativeSetter2.call(textareas[0], text);
+                    textareas[0].dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    document.getElementById('sttStatus_{idx}').innerHTML = 
+                        '🎯 Text applied directly to answer box!';
+                }}
+            }}
+        }}
+        </script>
+        """
+        
+        components.html(stt_html, height=200)
+
+        # ============================================================
+        # PYTHON BRIDGE: Read what JavaScript wrote into the bridge input
+        # ============================================================
+        bridge_val = st.text_input(
+            "Voice transcript bridge (hidden)",
+            key=stt_bridge_key,
+            label_visibility="collapsed",
+            placeholder="(transcript will appear here after recording)"
+        )
+        
+        # If bridge has content, offer a clear 'Apply' action
+        if bridge_val and bridge_val.strip():
+            if st.button("🎯 Apply Voice to Answer", key=f"apply_stt_{idx}", use_container_width=False):
+                st.session_state[f"ans_{idx}"] = bridge_val.strip()
+                st.session_state[stt_bridge_key] = ""  # Clear bridge
+                st.rerun()
+
+        # 🛡️ UI SYNC FIX: Bind text_area directly to session state via key
+        if f"ans_{idx}" not in st.session_state:
+            st.session_state[f"ans_{idx}"] = st.session_state.answers.get(idx, {}).get("answer", "")
+            
+        ans = st.text_area("Final Technical Response", height=200, key=f"ans_{idx}")
         
         c1, c2 = st.columns([1, 2])
         with c1:
@@ -568,15 +732,42 @@ elif st.session_state.app_state == "INTERVIEW":
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-elif st.session_state.app_state == "REPORT":
-    st.markdown("<h1 style='text-align: center; margin-bottom: 2rem;'>📋 Audit Certification</h1>", unsafe_allow_html=True)
+if st.session_state.app_state == "REPORT":
+    if "final_report" not in st.session_state:
+        st.error("Report data missing. Please restart the audit.")
+        if st.button("RESTART"):
+            st.session_state.clear()
+            st.rerun()
+        st.stop()
+
     report = st.session_state.final_report
-    info = st.session_state.candidate_info
-    
+    info   = st.session_state.candidate_info
+    decision_color = {"SELECTED": "#16a34a", "REJECTED": "#dc2626"}.get(report.get('final_decision',''), "#ca8a04")
+
+    # ── Header banner
+    st.markdown(f"""
+    <div style='
+        background: linear-gradient(135deg,#4f46e5,#7c3aed);
+        color:white; padding:2.5rem 3rem; border-radius:20px; margin-bottom:2rem;
+        display:flex; align-items:center; justify-content:space-between;
+    '>
+        <div>
+            <p style='margin:0;opacity:0.8;font-size:0.85rem;text-transform:uppercase;
+                      letter-spacing:0.1em;'>Audit Certification</p>
+            <h1 style='margin:0.3rem 0 0;color:white;font-size:2rem;'>{info.get('name','Candidate')}</h1>
+            <p style='margin:0.3rem 0 0;opacity:0.75;font-size:0.95rem;'>{info.get('role','')} &bull; {info.get('experience','')}</p>
+        </div>
+        <div style='text-align:right;'>
+            <div style='font-size:0.8rem;opacity:0.75;'>Final Decision</div>
+            <div style='font-size:2.2rem;font-weight:800;'>{report.get('final_decision','N/A')}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     m1, m2, m3 = st.columns(3)
-    m1.metric("Technical Score", f"{report['interview_score']}%")
-    m2.metric("Behavioral Score", f"{report['behavior_score']}%")
-    m3.metric("Final Aggregate", f"{report['final_aggregate_score']}%")
+    m1.metric("Technical Score", f"{report.get('interview_score', 0)}%")
+    m2.metric("Behavioral Score", f"{report.get('behavior_score', 0)}%")
+    m3.metric("Final Aggregate", f"{report.get('final_aggregate_score', 0)}%")
     
     col_rep_l, col_rep_r = st.columns([2, 1])
     
