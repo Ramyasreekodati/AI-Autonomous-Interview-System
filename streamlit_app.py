@@ -283,9 +283,78 @@ class InterviewController:
 
 init_state()
 
-# 🎨 PRODUCTION-READY UI DESIGN
-with open("style.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+# 🎨 AGGRESSIVE ELITE UI OVERDRIVE
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+    /* ── BASE OVERRIDES ── */
+    [data-testid="stAppViewContainer"] {
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%) !important;
+    }
+    [data-testid="stHeader"] { background: transparent !important; }
+    
+    /* ── GLASS CARD (Aggressive) ── */
+    [data-testid="stVerticalBlock"] > div:has(div.prof-card) {
+        background: rgba(255, 255, 255, 0.03) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border-radius: 24px !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        padding: 2.5rem !important;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.3) !important;
+        margin-bottom: 2rem !important;
+    }
+    
+    /* ── TABS ── */
+    button[data-baseweb="tab"] {
+        color: #94a3b8 !important;
+        border-bottom: 2px solid transparent !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #4f46e5 !important;
+        border-bottom: 2px solid #4f46e5 !important;
+        background: rgba(79, 70, 229, 0.1) !important;
+    }
+
+    /* ── QUESTION CARD ── */
+    .question-card {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+        padding: 3rem !important;
+        border-radius: 24px !important;
+        color: white !important;
+        box-shadow: 0 10px 40px rgba(79, 70, 229, 0.4) !important;
+    }
+
+    /* ── SIDEBAR ── */
+    [data-testid="stSidebar"] {
+        background: rgba(15, 23, 42, 0.98) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    /* ── STATUS PILLS ── */
+    .status-pill {
+        padding: 10px 18px !important;
+        border-radius: 12px !important;
+        font-size: 0.8rem !important;
+        font-weight: 700 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+    }
+    .pill-online { background: rgba(16, 185, 129, 0.1) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.2) !important; }
+    .pill-offline { background: rgba(239, 68, 68, 0.1) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.2) !important; }
+    
+    .stButton>button {
+        background: linear-gradient(135deg, #4f46e5, #7c3aed) !important;
+        border: none !important;
+        border-radius: 12px !important;
+        color: white !important;
+        font-weight: 700 !important;
+        height: 3.5rem !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # --------------------------------------------------
 # 3. 🚀 WORKFLOW ROUTING
@@ -333,7 +402,7 @@ if st.session_state.app_state == "DASHBOARD":
         with col_l:
             st.markdown("<div class='prof-card'>", unsafe_allow_html=True)
             with st.form("setup_form", clear_on_submit=False):
-                st.markdown("#### 👤 Candidate Profile")
+                st.markdown("<h3 style='margin-top:0;'>👤 Candidate Profile</h3>", unsafe_allow_html=True)
                 c1, c2 = st.columns(2)
                 name = c1.text_input("Full Name", "Candidate X")
                 email = c2.text_input("Email Address", "candidate@audit.ai")
@@ -357,19 +426,19 @@ if st.session_state.app_state == "DASHBOARD":
 
         with col_r:
             st.markdown("<div class='prof-card'>", unsafe_allow_html=True)
-            st.markdown("### System Status")
+            st.markdown("<h3 style='margin-top:0;'>System Status</h3>", unsafe_allow_html=True)
             ai_ok = ai_engine and ai_engine.model
             proc_ok = surveillance is not None
             stt_ok = True
             def _pill(label, ok, local_label=None):
-                if ok: return f"<span class='status-pill pill-online' style='color:#10b981;font-weight:bold;'>{label}: ONLINE</span>"
-                elif local_label: return f"<span class='status-pill pill-local' style='color:#3b82f6;'>{label}: {local_label}</span>"
-                else: return f"<span class='status-pill pill-offline' style='color:#ef4444;'>{label}: OFFLINE</span>"
-            st.markdown(f"<div style='display:flex;flex-direction:column;gap:10px;margin-bottom:1.5rem;'>{_pill('AI Engine', ai_ok, 'LOCAL')}{_pill('Proctoring', proc_ok, 'DISABLED')}{_pill('Voice STT', stt_ok)}</div>", unsafe_allow_html=True)
+                if ok: return f"<div class='status-pill pill-online'><span>●</span> {label}: ONLINE</div>"
+                elif local_label: return f"<div class='status-pill pill-local' style='color:#3b82f6;'><span>○</span> {label}: {local_label}</div>"
+                else: return f"<div class='status-pill pill-offline'><span>×</span> {label}: OFFLINE</div>"
+            st.markdown(f"<div style='display:flex;flex-direction:column;gap:12px;margin-bottom:1.5rem;'>{_pill('AI Engine', ai_ok, 'LOCAL')}{_pill('Proctoring', proc_ok, 'DISABLED')}{_pill('Voice STT', stt_ok)}</div>", unsafe_allow_html=True)
             st.markdown("#### Recent Activity")
             if st.session_state.logs:
                 for log in reversed(st.session_state.logs[-5:]):
-                    st.markdown(f"<div style='font-size:0.8rem;color:#64748b;margin-bottom:6px;'><b>[{log['timestamp']}]</b> {log['message']}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='font-size:0.8rem;color:var(--text-dim);margin-bottom:6px;'><b>[{log['timestamp']}]</b> {log['message']}</div>", unsafe_allow_html=True)
             else: st.caption("Awaiting session start...")
             st.markdown("</div>", unsafe_allow_html=True)
 

@@ -1,87 +1,104 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
+:root {
+    --primary: #4f46e5;
+    --primary-glow: rgba(79, 70, 229, 0.4);
+    --accent-blue: #3b82f6;
+    --accent-purple: #8b5cf6;
+    --accent-teal: #14b8a6;
+    --glass-bg: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --text-main: #f8fafc;
+    --text-dim: #94a3b8;
 }
 
-/* ── ANIMATIONS ── */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+/* ── GLOBAL RESET ── */
+.main {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%) !important;
+    color: var(--text-main) !important;
 }
-@keyframes pulseGlow {
-    0% { box-shadow: 0 0 5px rgba(79,70,229,0.2); }
-    50% { box-shadow: 0 0 20px rgba(79,70,229,0.5); }
-    100% { box-shadow: 0 0 5px rgba(79,70,229,0.2); }
-}
-.fade-in { animation: fadeIn 0.6s ease-out forwards; }
 
-/* ── GLASSMORPHISM CARD ── */
+/* ── GLASSMORPHISM CARD (FORCED) ── */
+div[data-testid="stVerticalBlock"] > div.element-container:has(.prof-card),
 .prof-card {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    padding: 2rem;
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    margin-bottom: 1.5rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
+    background: var(--glass-bg) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    padding: 2.5rem !important;
+    border-radius: 24px !important;
+    border: 1px solid var(--glass-border) !important;
+    margin-bottom: 2rem !important;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.3) !important;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
-.prof-card:hover { 
-    transform: translateY(-2px);
-    border-color: rgba(99, 102, 241, 0.3);
+
+.prof-card:hover {
+    border-color: var(--primary) !important;
+    transform: translateY(-5px) !important;
+    box-shadow: 0 25px 60px rgba(79, 70, 229, 0.2) !important;
+}
+
+/* ── TABS STYLING (THE TRICKY PART) ── */
+button[data-baseweb="tab"] {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-dim) !important;
+    font-weight: 500 !important;
+    transition: all 0.3s ease !important;
+}
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: var(--primary) !important;
+    font-weight: 700 !important;
+    border-bottom: 3px solid var(--primary) !important;
 }
 
 /* ── QUESTION CARD ── */
 .question-card {
-    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-    padding: 2.5rem;
-    border-radius: 20px;
-    margin-bottom: 1.5rem;
-    color: white;
-    position: relative;
-    overflow: hidden;
-    animation: pulseGlow 4s infinite ease-in-out;
-}
-.question-card::before {
-    content: '';
-    position: absolute; top: -50px; right: -50px;
-    width: 200px; height: 200px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 100%) !important;
+    padding: 3rem !important;
+    border-radius: 24px !important;
+    margin-bottom: 2rem !important;
+    color: white !important;
+    box-shadow: 0 10px 30px var(--primary-glow) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
 }
 
-/* ── PULSE INDICATOR ── */
-.pulse-dot {
-    height: 8px; width: 8px;
-    background-color: #10b981;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: 8px;
-    box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
-    animation: pulseDot 2s infinite;
+/* ── STATUS PILLS ── */
+.status-pill {
+    padding: 8px 16px !important;
+    border-radius: 100px !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.5px !important;
+    text-transform: uppercase !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
 }
-@keyframes pulseDot {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
+.pill-online { background: rgba(16, 185, 129, 0.1) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.2) !important; }
+.pill-offline { background: rgba(239, 68, 68, 0.1) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.2) !important; }
 
-/* ── SIDEBAR BRANDING ── */
+/* ── SIDEBAR ── */
 [data-testid="stSidebar"] {
-    background-image: linear-gradient(180deg, rgba(79,70,229,0.05) 0%, rgba(255,255,255,0) 100%);
+    background: rgba(15, 23, 42, 0.95) !important;
+    backdrop-filter: blur(10px) !important;
+    border-right: 1px solid var(--glass-border) !important;
 }
 
-/* ── BUTTONS ── */
+/* ── BUTTONS (ELITE STYLE) ── */
 .stButton>button {
-    background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
-    color: white !important; border-radius: 12px !important;
-    padding: 0.8rem 2.2rem !important; border: none !important;
-    font-weight: 600 !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    width: 100% !important;
+    background: linear-gradient(135deg, var(--primary), var(--accent-purple)) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 14px !important;
+    padding: 1rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    transition: all 0.3s ease !important;
 }
 .stButton>button:hover {
-    letter-spacing: 0.5px !important;
-    filter: brightness(1.1);
+    transform: scale(1.02) !important;
+    box-shadow: 0 0 20px var(--primary-glow) !important;
 }
