@@ -120,7 +120,7 @@ def log_event(event_type, message):
 
 class InterviewController:
     @staticmethod
-    def initialize_session(name, role, skills, diff, count, exp, i_type, style):
+    def initialize_session(name, email, role, skills, diff, count, exp, i_type, style):
         st.session_state.candidate_info = {
             "name": name,
             "role": role,
@@ -352,7 +352,7 @@ if st.session_state.app_state == "DASHBOARD":
                 st.markdown("<br>", unsafe_allow_html=True)
                 submit = st.form_submit_button("🚀 START PROFESSIONAL AUDIT", use_container_width=True)
                 if submit:
-                    InterviewController.initialize_session(name, role, skills, diff, count, exp, i_type, style)
+                    InterviewController.initialize_session(name, email, role, skills, diff, count, exp, i_type, style)
             st.markdown("</div>", unsafe_allow_html=True)
 
         with col_r:
@@ -406,28 +406,28 @@ if st.session_state.app_state == "DASHBOARD":
                     st.error("❌ File too large. Please upload a resume under 5MB.")
                 else:
                     with st.spinner("AI is auditing your credentials..."):
-                    # Process file
-                    if uploaded_file.type == "application/pdf":
-                        import io, PyPDF2
-                        reader = PyPDF2.PdfReader(io.BytesIO(uploaded_file.read()))
-                        text = "".join([page.extract_text() for page in reader.pages])
-                    else:
-                        text = uploaded_file.read().decode("utf-8")
-                    
-                    analysis = ai_engine.analyze_resume_v2(text, job_desc or "Generic Professional Role")
-                    
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("Readability", f"{analysis.get('readability',0)}%")
-                    c2.metric("Credibility", f"{analysis.get('credibility',0)}%")
-                    c3.metric("ATS Fit", f"{analysis.get('ats_fit',0)}%")
-                    
-                    st.success("Analysis Complete!")
-                    st.markdown("#### Strengths")
-                    for s in analysis.get('strengths', []): st.write(f"✅ {s}")
-                    st.markdown("#### Areas for Improvement")
-                    for w in analysis.get('weaknesses', []): st.write(f"⚠️ {w}")
-                    if analysis.get('critical_keywords_missing'):
-                        st.warning(f"Missing Keywords: {', '.join(analysis['critical_keywords_missing'])}")
+                        # Process file
+                        if uploaded_file.type == "application/pdf":
+                            import io, PyPDF2
+                            reader = PyPDF2.PdfReader(io.BytesIO(uploaded_file.read()))
+                            text = "".join([page.extract_text() for page in reader.pages])
+                        else:
+                            text = uploaded_file.read().decode("utf-8")
+                        
+                        analysis = ai_engine.analyze_resume_v2(text, job_desc or "Generic Professional Role")
+                        
+                        c1, c2, c3 = st.columns(3)
+                        c1.metric("Readability", f"{analysis.get('readability',0)}%")
+                        c2.metric("Credibility", f"{analysis.get('credibility',0)}%")
+                        c3.metric("ATS Fit", f"{analysis.get('ats_fit',0)}%")
+                        
+                        st.success("Analysis Complete!")
+                        st.markdown("#### Strengths")
+                        for s in analysis.get('strengths', []): st.write(f"✅ {s}")
+                        st.markdown("#### Areas for Improvement")
+                        for w in analysis.get('weaknesses', []): st.write(f"⚠️ {w}")
+                        if analysis.get('critical_keywords_missing'):
+                            st.warning(f"Missing Keywords: {', '.join(analysis['critical_keywords_missing'])}")
             else:
                 st.warning("Please upload a file and ensure AI Engine is online.")
         st.markdown("</div>", unsafe_allow_html=True)
