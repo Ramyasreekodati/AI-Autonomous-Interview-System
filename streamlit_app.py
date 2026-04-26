@@ -13,22 +13,29 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 🔴 FIX 8: Safe Import Handling
-try:
-    from backend.services.ai_engine import ai_engine
-except ImportError:
-    st.error("AI Engine not found. Ensure backend services are correctly linked.")
-    ai_engine = None
+@st.cache_resource
+def get_ai_engine():
+    try:
+        from backend.services.ai_engine import ai_engine
+        return ai_engine
+    except ImportError:
+        return None
+
+@st.cache_resource
+def get_surveillance():
+    try:
+        from backend.services.surveillance import surveillance
+        return surveillance
+    except ImportError:
+        return None
+
+ai_engine = get_ai_engine()
+surveillance = get_surveillance()
 
 try:
     from backend.services.reporting import reporting_service
 except ImportError:
     reporting_service = None
-
-try:
-    from backend.services.surveillance import surveillance
-except ImportError:
-    surveillance = None
 
 try:
     from streamlit_mic_recorder import mic_recorder
@@ -378,7 +385,21 @@ st.markdown("""
 with st.sidebar:
     st.markdown("<h2 style='color: #4f46e5; margin-bottom: 0;'>RecruitAI</h2>", unsafe_allow_html=True)
     st.markdown("<p style='color: #64748b; font-size: 0.8rem; margin-top: 0; font-weight: 600; letter-spacing: 1px;'>ELITE AUDITOR v3.0</p>", unsafe_allow_html=True)
+    
+    # 📡 BACKEND SENTINEL
+    backend_ok = False
+    try:
+        chk = requests.get("http://127.0.0.1:8000/docs", timeout=1)
+        backend_ok = chk.status_code == 200
+    except: pass
+    
     st.divider()
+    if backend_ok:
+        st.success("📡 Backend: ONLINE")
+    else:
+        st.error("📡 Backend: OFFLINE")
+        st.info("💡 Run 'uvicorn main:app' in the backend folder.")
+    
     if st.session_state.app_state != "DASHBOARD":
         st.markdown("### 🛠 Audit Control")
         if st.button("🚪 ABORT SESSION", use_container_width=True):
@@ -472,7 +493,10 @@ if st.session_state.app_state == "DASHBOARD":
         
         if st.button("🔍 ANALYZE RESUME", use_container_width=True):
             if uploaded_file and ai_engine:
-                with st.spinner("AI is auditing your credentials..."):
+                if uploaded_file.size > 5 * 1024 * 1024:
+                    st.error("❌ File too large. Please upload a resume under 5MB.")
+                else:
+                    with st.spinner("AI is auditing your credentials..."):
                     # Process file
                     if uploaded_file.type == "application/pdf":
                         import io, PyPDF2
@@ -806,6 +830,13 @@ if st.session_state.app_state == "REPORT":
     m1.metric("Technical Score", f"{report.get('interview_score', 0)}%")
     m2.metric("Behavioral Score", f"{report.get('behavior_score', 0)}%")
     m3.metric("Final Aggregate", f"{report.get('final_aggregate_score', 0)}%")
+    
+    # 📈 Performance Visualization
+    chart_data = pd.DataFrame({
+        'Category': ['Technical', 'Behavioral', 'Aggregate'],
+        'Score': [report.get('interview_score', 0), report.get('behavior_score', 0), report.get('final_aggregate_score', 0)]
+    })
+    st.bar_chart(chart_data.set_index('Category'))
     
     col_rep_l, col_rep_r = st.columns([2, 1])
     
