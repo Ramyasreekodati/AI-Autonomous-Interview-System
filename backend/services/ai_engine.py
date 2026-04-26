@@ -112,7 +112,6 @@ class AIEngine:
         MULTIMODAL STT: Direct cloud processing for bytes.
         Always uses gemini-1.5-flash which supports audio input.
         """
-        global _CONFIGURED_API_KEY
         if not _CONFIGURED_API_KEY:
             print("[AIEngine] transcribe_bytes: No API key available.")
             return None
@@ -125,11 +124,12 @@ class AIEngine:
                 "Transcribe every word spoken accurately. "
                 "If there is only silence or background noise with no speech, return exactly: [SILENCE]"
             )
+            print(f"[AIEngine] Transcribing {len(audio_data)} bytes...")
             response = multimodal_model.generate_content([prompt, audio_part])
             text = response.text.strip()
-            print(f"[AIEngine] Transcription result: {text[:80]}...")
+            print(f"[AIEngine] Raw Transcription: '{text}'")
             # Return empty string for silence, actual text otherwise
-            if text == "[SILENCE]" or not text:
+            if "[SILENCE]" in text or not text:
                 return ""
             return text
         except Exception as e:
