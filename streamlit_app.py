@@ -54,10 +54,7 @@ except ImportError:
 def get_db_sync():
     if SessionLocal:
         db = SessionLocal()
-        try:
-            return db
-        except:
-            db.close()
+        return db # 🛡️ FIX 11: Management moved to caller for better control
     return None
 
 import requests
@@ -286,97 +283,9 @@ class InterviewController:
 
 init_state()
 
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
-
-    /* ── ANIMATIONS ── */
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes pulseGlow {
-        0% { box-shadow: 0 0 5px rgba(79,70,229,0.2); }
-        50% { box-shadow: 0 0 20px rgba(79,70,229,0.5); }
-        100% { box-shadow: 0 0 5px rgba(79,70,229,0.2); }
-    }
-    .fade-in { animation: fadeIn 0.6s ease-out forwards; }
-
-    /* ── GLASSMORPHISM CARD ── */
-    .prof-card {
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        padding: 2rem;
-        border-radius: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        margin-bottom: 1.5rem;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-        transition: all 0.3s ease;
-    }
-    .prof-card:hover { 
-        transform: translateY(-2px);
-        border-color: rgba(99, 102, 241, 0.3);
-    }
-
-    /* ── QUESTION CARD ── */
-    .question-card {
-        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-        padding: 2.5rem;
-        border-radius: 20px;
-        margin-bottom: 1.5rem;
-        color: white;
-        position: relative;
-        overflow: hidden;
-        animation: pulseGlow 4s infinite ease-in-out;
-    }
-    .question-card::before {
-        content: '';
-        position: absolute; top: -50px; right: -50px;
-        width: 200px; height: 200px;
-        background: rgba(255,255,255,0.1);
-        border-radius: 50%;
-    }
-
-    /* ── PULSE INDICATOR ── */
-    .pulse-dot {
-        height: 8px; width: 8px;
-        background-color: #10b981;
-        border-radius: 50%;
-        display: inline-block;
-        margin-right: 8px;
-        box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
-        animation: pulseDot 2s infinite;
-    }
-    @keyframes pulseDot {
-        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-        70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
-        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-    }
-
-    /* ── SIDEBAR BRANDING ── */
-    [data-testid="stSidebar"] {
-        background-image: linear-gradient(180deg, rgba(79,70,229,0.05) 0%, rgba(255,255,255,0) 100%);
-    }
-
-    /* ── BUTTONS ── */
-    .stButton>button {
-        background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
-        color: white !important; border-radius: 12px !important;
-        padding: 0.8rem 2.2rem !important; border: none !important;
-        font-weight: 600 !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    }
-    .stButton>button:hover {
-        letter-spacing: 0.5px !important;
-        filter: brightness(1.1);
-    }
-</style>
-""", unsafe_allow_html=True)
+# 🎨 PRODUCTION-READY UI DESIGN
+with open("style.css") as f:
+    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 # --------------------------------------------------
 # 3. 🚀 WORKFLOW ROUTING
