@@ -7,10 +7,10 @@ from dotenv import load_dotenv
 
 # 🔴 FIX 7: set_page_config must be FIRST
 st.set_page_config(
-    page_title="RecruitAI Professional Auditor",
-    page_icon="📋",
+    page_title="InterviewAI Elite | Master Your Future",
+    page_icon="🧠",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # 🔴 FIX 8: Safe Import Handling
@@ -56,18 +56,21 @@ def get_db_sync():
 import requests
 
 # 🛡️ ARCHITECT FIX: UI → API Gateway Bridge
-API_BASE_URL = "http://localhost:8000/interview"
+API_BASE_URL = "http://127.0.0.1:8000/interview"
 
 def call_api(endpoint, data=None, method="POST"):
     """
-    Production-grade REST bridge to FastAPI backend.
+    Production-grade REST bridge to FastAPI backend with JWT support.
     """
+    token = st.session_state.get("access_token")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    
     try:
-        url = f"{API_BASE_URL.replace('/interview', '')}/{endpoint}" if "/" not in endpoint else f"http://localhost:8000{endpoint}"
+        url = f"{API_BASE_URL.replace('/interview', '')}/{endpoint}" if "/" not in endpoint else f"http://127.0.0.1:8000{endpoint}"
         if method == "POST":
-            response = requests.post(url, json=data, timeout=10)
+            response = requests.post(url, json=data, headers=headers, timeout=10)
         else:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
             return response.json()
@@ -141,6 +144,7 @@ class InterviewController:
                 interview_id = api_res.get("interview_id") if api_res else None
                 if interview_id:
                     st.session_state.active_interview_id = interview_id
+                    st.session_state.access_token = api_res.get("access_token")
 
                 # Fetch questions from DB (the API stored them there)
                 fetched_questions = []
@@ -385,80 +389,114 @@ if st.session_state.app_state == "DASHBOARD":
     engine_mode = "AI Core Active" if (ai_engine and ai_engine.model) else "Local Engine Active"
     st.markdown(
         f"<div class='fade-in'>"
-        f"<h1 style='margin-bottom:0.3rem;'>Autonomous Interview System</h1>"
-        f"<p class='header-text'><span class='pulse-dot'></span>{engine_mode} &nbsp;|&nbsp; Precision Audit v3.0</p>"
+        f"<h1 style='margin-bottom:0.3rem;'>InterviewAI Elite</h1>"
+        f"<p class='header-text'><span class='pulse-dot'></span>{engine_mode} &nbsp;|&nbsp; Master Your Future v3.0</p>"
         f"</div>",
         unsafe_allow_html=True
     )
     
-    col_l, col_r = st.columns([2, 1])
-    
-    with col_l:
-        st.markdown("<div class='prof-card'>", unsafe_allow_html=True)
+    tab_dash, tab_curr, tab_resume = st.tabs(["🚀 Practice Room", "📚 Curriculum", "📄 Resume AI"])
+
+    with tab_dash:
+        col_l, col_r = st.columns([2, 1])
         
-        with st.form("setup_form", clear_on_submit=False):
-            st.markdown("#### 👤 Candidate Profile")
-            c1, c2 = st.columns(2)
-            name = c1.text_input("Full Name", "Candidate X")
-            email = c2.text_input("Email Address", "candidate@audit.ai")
-            
-            c3, c4 = st.columns(2)
-            role = c3.text_input("Target Role", "Senior Software Engineer")
-            skills = c4.text_input("Core Skills (CSV)", "Python, Distributed Systems, AWS")
-            
-            st.divider()
-            st.markdown("#### ⚙️ Audit Calibration")
-            
-            c5, c6, c7 = st.columns(3)
-            diff = c5.selectbox("Intensity", ["Junior", "Mid", "Senior", "Lead", "Architect"], index=2)
-            count = c6.number_input("Question Count", 1, 10, 3)
-            exp = c7.selectbox("Tenure", ["0-1Y", "1-3Y", "3-5Y", "5-10Y", "10+Y"], index=3)
-            
-            c8, c9 = st.columns(2)
-            i_type = c8.selectbox("Audit Type", ["Technical", "Behavioral", "System Design", "Mixed"])
-            style = c9.selectbox("Interviewer Persona", ["Professional", "Challenging", "Friendly", "Strict"])
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            submit = st.form_submit_button("🚀 START PROFESSIONAL AUDIT", use_container_width=True)
-            if submit:
-                InterviewController.initialize_session(name, role, skills, diff, count, exp, i_type, style)
+        with col_l:
+            st.markdown("<div class='prof-card'>", unsafe_allow_html=True)
+            with st.form("setup_form", clear_on_submit=False):
+                st.markdown("#### 👤 Candidate Profile")
+                c1, c2 = st.columns(2)
+                name = c1.text_input("Full Name", "Candidate X")
+                email = c2.text_input("Email Address", "candidate@audit.ai")
+                c3, c4 = st.columns(2)
+                role = c3.text_input("Target Role", "Senior Software Engineer")
+                skills = c4.text_input("Core Skills (CSV)", "Python, Distributed Systems, AWS")
+                st.divider()
+                st.markdown("#### ⚙️ Audit Calibration")
+                c5, c6, c7 = st.columns(3)
+                diff = c5.selectbox("Intensity", ["Junior", "Mid", "Senior", "Lead", "Architect"], index=2)
+                count = c6.number_input("Question Count", 1, 10, 3)
+                exp = c7.selectbox("Tenure", ["0-1Y", "1-3Y", "3-5Y", "5-10Y", "10+Y"], index=3)
+                c8, c9 = st.columns(2)
+                i_type = c8.selectbox("Audit Type", ["Technical", "Behavioral", "System Design", "Mixed"])
+                style = c9.selectbox("Interviewer Persona", ["Professional", "Challenging", "Friendly", "Strict"])
+                st.markdown("<br>", unsafe_allow_html=True)
+                submit = st.form_submit_button("🚀 START PROFESSIONAL AUDIT", use_container_width=True)
+                if submit:
+                    InterviewController.initialize_session(name, role, skills, diff, count, exp, i_type, style)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with col_r:
+            st.markdown("<div class='prof-card'>", unsafe_allow_html=True)
+            st.markdown("### System Status")
+            ai_ok = ai_engine and ai_engine.model
+            proc_ok = surveillance is not None
+            stt_ok = True
+            def _pill(label, ok, local_label=None):
+                if ok: return f"<span class='status-pill pill-online' style='color:#10b981;font-weight:bold;'>{label}: ONLINE</span>"
+                elif local_label: return f"<span class='status-pill pill-local' style='color:#3b82f6;'>{label}: {local_label}</span>"
+                else: return f"<span class='status-pill pill-offline' style='color:#ef4444;'>{label}: OFFLINE</span>"
+            st.markdown(f"<div style='display:flex;flex-direction:column;gap:10px;margin-bottom:1.5rem;'>{_pill('AI Engine', ai_ok, 'LOCAL')}{_pill('Proctoring', proc_ok, 'DISABLED')}{_pill('Voice STT', stt_ok)}</div>", unsafe_allow_html=True)
+            st.markdown("#### Recent Activity")
+            if st.session_state.logs:
+                for log in reversed(st.session_state.logs[-5:]):
+                    st.markdown(f"<div style='font-size:0.8rem;color:#64748b;margin-bottom:6px;'><b>[{log['timestamp']}]</b> {log['message']}</div>", unsafe_allow_html=True)
+            else: st.caption("Awaiting session start...")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    with tab_curr:
+        st.markdown("<div class='prof-card'>", unsafe_allow_html=True)
+        st.markdown("### 📚 Professional Curriculum")
+        st.write("Master these core competencies to ace your next high-stakes interview.")
+        cols = st.columns(3)
+        lessons = [
+            ("Distributed Systems", "Scaling high-availability clusters", "var(--accent-blue)"),
+            ("Behavioral STAR", "Mastering the Situation-Task-Action-Result method", "var(--accent-teal)"),
+            ("System Design", "Architecting resilient cloud infrastructures", "var(--accent-purple)")
+        ]
+        for i, (title, desc, color) in enumerate(lessons):
+            with cols[i % 3]:
+                st.markdown(f"""
+                <div style='padding:1.5rem; background:rgba(255,255,255,0.03); border-radius:15px; border:1px solid rgba(255,255,255,0.05);'>
+                    <h4 style='margin-top:0;'>{title}</h4>
+                    <p style='font-size:0.85rem; color:#94a3b8;'>{desc}</p>
+                    <button style='background:transparent; border:1px solid #6366f1; color:#6366f1; padding:5px 12px; border-radius:5px; font-size:0.75rem;'>Start Lesson</button>
+                </div>
+                """, unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with col_r:
+    with tab_resume:
         st.markdown("<div class='prof-card'>", unsafe_allow_html=True)
-        st.markdown("### System Status")
-
-        ai_ok  = ai_engine and ai_engine.model
-        proc_ok = surveillance is not None
-        stt_ok  = True  # Always available via browser
-
-        def _pill(label, ok, local_label=None):
-            if ok:
-                return f"<span class='status-pill pill-online'>{label}: ONLINE</span>"
-            elif local_label:
-                return f"<span class='status-pill pill-local'>{label}: {local_label}</span>"
+        st.markdown("### 📄 Resume AI Analyzer")
+        uploaded_file = st.file_uploader("Upload your Resume (PDF or TXT)", type=["pdf", "txt"])
+        job_desc = st.text_area("Job Description (Optional)", placeholder="Paste the job description for better alignment...")
+        
+        if st.button("🔍 ANALYZE RESUME", use_container_width=True):
+            if uploaded_file and ai_engine:
+                with st.spinner("AI is auditing your credentials..."):
+                    # Process file
+                    if uploaded_file.type == "application/pdf":
+                        import io, PyPDF2
+                        reader = PyPDF2.PdfReader(io.BytesIO(uploaded_file.read()))
+                        text = "".join([page.extract_text() for page in reader.pages])
+                    else:
+                        text = uploaded_file.read().decode("utf-8")
+                    
+                    analysis = ai_engine.analyze_resume_v2(text, job_desc or "Generic Professional Role")
+                    
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Readability", f"{analysis.get('readability',0)}%")
+                    c2.metric("Credibility", f"{analysis.get('credibility',0)}%")
+                    c3.metric("ATS Fit", f"{analysis.get('ats_fit',0)}%")
+                    
+                    st.success("Analysis Complete!")
+                    st.markdown("#### Strengths")
+                    for s in analysis.get('strengths', []): st.write(f"✅ {s}")
+                    st.markdown("#### Areas for Improvement")
+                    for w in analysis.get('weaknesses', []): st.write(f"⚠️ {w}")
+                    if analysis.get('critical_keywords_missing'):
+                        st.warning(f"Missing Keywords: {', '.join(analysis['critical_keywords_missing'])}")
             else:
-                return f"<span class='status-pill pill-offline'>{label}: OFFLINE</span>"
-
-        st.markdown(
-            f"<div style='display:flex;flex-direction:column;gap:10px;margin-bottom:1.5rem;'>"
-            f"{_pill('AI Engine', ai_ok, 'LOCAL')}"
-            f"{_pill('Proctoring', proc_ok, 'DISABLED')}"
-            f"{_pill('Voice STT', stt_ok)}"
-            f"</div>",
-            unsafe_allow_html=True
-        )
-
-        st.markdown("#### Recent Activity")
-        if st.session_state.logs:
-            for log in reversed(st.session_state.logs[-5:]):
-                st.markdown(
-                    f"<div style='font-size:0.8rem;color:#64748b;margin-bottom:6px;'>"
-                    f"<b>[{log['timestamp']}]</b> {log['message']}</div>",
-                    unsafe_allow_html=True
-                )
-        else:
-            st.caption("Awaiting session start...")
+                st.warning("Please upload a file and ensure AI Engine is online.")
         st.markdown("</div>", unsafe_allow_html=True)
 
 elif st.session_state.app_state == "INTERVIEW":
