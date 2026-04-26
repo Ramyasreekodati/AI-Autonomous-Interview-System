@@ -27,6 +27,10 @@ def run_migrations():
             conn.execute(text("ALTER TABLE interviews ADD COLUMN infinite_mode BOOLEAN DEFAULT 0"))
         if "adaptive_mode" not in columns:
             conn.execute(text("ALTER TABLE interviews ADD COLUMN adaptive_mode BOOLEAN DEFAULT 1"))
+        if "target_role" not in columns:
+            conn.execute(text("ALTER TABLE interviews ADD COLUMN target_role VARCHAR"))
+        if "target_skills" not in columns:
+            conn.execute(text("ALTER TABLE interviews ADD COLUMN target_skills VARCHAR"))
         conn.commit()
 
 try:
@@ -58,6 +62,16 @@ app.add_middleware(
 
 app.include_router(interview.router)
 app.include_router(auth.router)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    from fastapi.responses import JSONResponse
+    import logging
+    logging.error(f"Global Error: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected server error occurred. Please try again later."}
+    )
 
 # WebSocket connection manager
 class ConnectionManager:

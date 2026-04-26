@@ -265,3 +265,16 @@ p { color: var(--text-secondary); }
     background: rgba(255,255,255,0.08);
     transform: translateX(10px);
 }
+
+/* --- Pulse Animation for Recording --- */
+.pulse {
+    animation: pulse-red 2s infinite;
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    border-color: #EF4444 !important;
+}
+
+@keyframes pulse-red {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}

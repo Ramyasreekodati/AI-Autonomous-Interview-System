@@ -1,5 +1,5 @@
 // ── Config ────────────────────────────────────────────────────────────────────
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'http://127.0.0.1:8000';
 
 // ── App State ─────────────────────────────────────────────────────────────────
 const state = {
@@ -71,7 +71,7 @@ function stopCamera() {
 // ── WebSocket: Proctoring Alerts ──────────────────────────────────────────────
 function connectAlertWebSocket() {
     try {
-        state.wsAlerts = new WebSocket(`ws://localhost:8000/ws/alerts`);
+        state.wsAlerts = new WebSocket(`ws://127.0.0.1:8000/ws/alerts`);
         state.wsAlerts.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (data.alerts?.length) showToast(`🚨 Alert: ${data.alerts[0]}`, 'warning');
@@ -81,22 +81,29 @@ function connectAlertWebSocket() {
 }
 
 // ── Proctoring: Send Frames Every 3s ─────────────────────────────────────────
+let isProcessingFrame = false;
 function startProctoring() {
     if (!state.interviewId) return;
     const video = document.getElementById('webcam-preview');
     state.proctoringInterval = setInterval(async () => {
-        if (!state.stream || !state.interviewId || !video.videoWidth) return;
+        if (!state.stream || !state.interviewId || !video.videoWidth || isProcessingFrame) return;
+        
         try {
+            isProcessingFrame = true;
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth; canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
             canvas.toBlob(async (blob) => {
-                if (!blob) return;
+                if (!blob) { isProcessingFrame = false; return; }
                 const form = new FormData();
                 form.append('file', blob, 'frame.jpg');
-                await fetch(`${API_BASE}/proctoring/process_frame?interview_id=${state.interviewId}`, { method: 'POST', body: form });
+                try {
+                    await fetch(`${API_BASE}/proctoring/process_frame?interview_id=${state.interviewId}`, { method: 'POST', body: form });
+                } finally {
+                    isProcessingFrame = false;
+                }
             }, 'image/jpeg', 0.7);
-        } catch (e) { /* silent */ }
+        } catch (e) { isProcessingFrame = false; }
     }, 3000);
 }
 
@@ -178,7 +185,7 @@ async function loadQuestion(index) {
             return;
         }
 
-        state.currentQuestionId = data.question_id;
+        state.currentQuestionId = data.id;
         state.currentQuestionIndex = index;
 
         questionEl.classList.remove('animate-fade');
@@ -280,13 +287,23 @@ function renderFeedback(result) {
 // ── Audio Recording ───────────────────────────────────────────────────────────
 async function toggleRecording() {
     const btn = document.getElementById('btn-record');
+    if (!navigator.mediaDevices || !window.MediaRecorder) {
+        showToast('❌ Recording not supported in this browser.', 'error');
+        return;
+    }
+    if (!state.currentQuestionId) {
+        showToast('⚠️ Wait for the question to load before recording.', 'warning');
+        return;
+    }
+
     if (!state.isRecording) {
         try {
             const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
             state.audioChunks = [];
             state.mediaRecorder = new MediaRecorder(audioStream);
-            state.mediaRecorder.ondataavailable = (e) => state.audioChunks.push(e.data);
+            state.mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) state.audioChunks.push(e.data); };
             state.mediaRecorder.onstop = async () => {
+                if (state.audioChunks.length === 0) return;
                 const blob = new Blob(state.audioChunks, { type: 'audio/webm' });
                 await submitAudioAnswer(blob);
                 audioStream.getTracks().forEach(t => t.stop());
@@ -295,12 +312,19 @@ async function toggleRecording() {
             state.isRecording = true;
             btn.innerHTML = '<i class="fas fa-stop" style="color:#EF4444"></i> Stop';
             btn.style.borderColor = '#EF4444';
-        } catch (e) { showToast('❌ Microphone access denied.', 'error'); }
+            btn.classList.add('pulse'); // Visual recording indicator
+        } catch (e) { 
+            console.error(e);
+            showToast('❌ Microphone access denied or not found.', 'error'); 
+        }
     } else {
-        state.mediaRecorder.stop();
+        if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+            state.mediaRecorder.stop();
+        }
         state.isRecording = false;
         btn.innerHTML = '<i class="fas fa-microphone"></i> Record';
         btn.style.borderColor = '';
+        btn.classList.remove('pulse');
     }
 }
 

@@ -209,18 +209,21 @@ async def submit_response(interview_id: int, data: schemas.ResponseSubmit, db: S
     return evaluation
 
 @router.post("/{interview_id}/submit-audio")
-async def submit_audio_response(interview_id: int, question_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    # Read audio bytes
+async def submit_audio_response(interview_id: int, question_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_id: int = Depends(get_current_interview)):
+    if interview_id != current_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this session")
+
     audio_bytes = await file.read()
     
-    # Use real AI for transcription
-    transcription = ai_engine.transcribe_bytes(audio_bytes)
+    # Run transcription in threadpool
+    transcription = await run_in_threadpool(ai_engine.transcribe_bytes, audio_bytes)
     
-    # Evaluate the transcribed answer
     interview = db.query(models.Interview).filter(models.Interview.id == interview_id).first()
     question = db.query(models.Question).filter(models.Question.id == question_id).first()
     
-    evaluation = ai_engine.evaluate_answer(
+    # Run evaluation in threadpool
+    evaluation = await run_in_threadpool(
+        ai_engine.evaluate_answer,
         question.text if question else "", 
         transcription,
         role=interview.target_role if interview else "Expert",

@@ -161,10 +161,14 @@ class AIEngine:
                 "tone": "Confident/Anxious/Neutral/Professional"
             }}
             """
-            response = self.model.generate_content(prompt)
-            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group())
+            try:
+                response = self.model.generate_content(prompt)
+                if not response.text: raise ValueError("Empty response")
+                json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+                if json_match:
+                    return json.loads(json_match.group())
+            except Exception as e:
+                print(f"[AIEngine] Sentiment analysis failed: {e}")
         except: pass
         return {"confidence": 50, "clarity": 50, "tone": "Neutral"}
 
@@ -246,7 +250,10 @@ class AIEngine:
             """
             
             response = self.model.generate_content(prompt)
-            return response.text.strip().strip('"')
+            # 🛡️ CLEANUP: Remove conversational filler and extract just the question
+            text = response.text.strip().split("\n")[0].strip('"').strip('*')
+            if len(text) < 10: raise ValueError("AI response too short")
+            return text
                 
         except Exception as e:
             print(f"[AIEngine] Dynamic Generation Failure: {str(e)}")
