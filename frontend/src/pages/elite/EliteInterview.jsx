@@ -41,25 +41,87 @@ const EliteInterview = () => {
   const [pace, setPace] = useState(145);
 
   useEffect(() => {
-    fetchQuestion(0);
+    fetchQuestion(true);
     startCamera();
     return () => stopCamera();
   }, [id]);
 
-  const fetchQuestion = async (index) => {
+  const fetchQuestion = async (isFirst = false) => {
     setLoading(true);
+    setError("");
     try {
-      const response = await axios.get(`http://localhost:8000/interview/${id}/question/${index}`);
+      let response;
+      if (isFirst) {
+        response = await axios.get(`http://localhost:8000/interview/${id}/question/0`);
+      } else {
+        response = await axios.get(`http://localhost:8000/interview/${id}/next-question`);
+      }
+
       if (response.data.finished) {
         navigate(`/result/${id}`);
         return;
       }
       setQuestionData(response.data);
-      setQuestionIndex(index);
+      setQuestionIndex(prev => isFirst ? 0 : prev + 1);
+      setAnswer("");
+      
+      // Speak the question
+      speakQuestion(response.data.text);
     } catch (err) {
       setError("Failed to sync with AI Engine.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const speakQuestion = (text) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = videoRef.current.srcObject;
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+      
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        await submitAudio(audioBlob);
+      };
+      
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Recording failed to start", err);
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current.stop();
+    setIsRecording(false);
+  };
+
+  const submitAudio = async (blob) => {
+    setSubmitting(true);
+    const formData = new FormData();
+    formData.append('file', blob, 'recording.wav');
+    try {
+      const response = await axios.post(
+        `http://localhost:8000/interview/${id}/submit-audio?question_id=${questionData.question_id}`, 
+        formData
+      );
+      setAnswer(response.data.transcription);
+    } catch (err) {
+      setError("AI Transcription failed.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -79,12 +141,23 @@ const EliteInterview = () => {
   };
 
   const handleNext = async () => {
+    if (!answer.trim() && isRecording) {
+      stopRecording();
+      return;
+    }
+    if (!answer.trim()) return;
+    
     setSubmitting(true);
-    // Simulate API call for demonstration, but you can integrate real axios.post here
-    setTimeout(() => {
-      fetchQuestion(questionIndex + 1);
+    try {
+      await axios.post(`http://localhost:8000/interview/${id}/submit-response`, null, {
+        params: { question_id: questionData.question_id, answer_text: answer }
+      });
+      fetchQuestion(false);
+    } catch (err) {
+      setError("Submission failed.");
+    } finally {
       setSubmitting(false);
-    }, 1000);
+    }
   };
 
   if (loading) return (
@@ -132,9 +205,54 @@ const EliteInterview = () => {
               autoPlay 
               playsInline 
               muted 
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover scale-x-[-1]"
             />
             
+            {/* AI Streaming Avatar (New Feature from YouTube guides) */}
+            <div className="absolute top-8 right-8 z-30">
+               <motion.div 
+                 initial={{ opacity: 0, x: 20 }}
+                 animate={{ opacity: 1, x: 0 }}
+                 className="w-48 h-64 bg-slate-800/80 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl"
+               >
+                  <div className="h-full w-full bg-gradient-to-br from-indigo-900 to-slate-900 flex flex-col items-center justify-center p-4">
+                     <div className="w-20 h-20 bg-indigo-500/20 rounded-full flex items-center justify-center mb-4 ring-2 ring-indigo-500/50">
+                        <Brain className="text-indigo-400 w-10 h-10 animate-pulse" />
+                     </div>
+                     <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest text-center">AI Interviewer</p>
+                     <p className="text-xs font-bold text-white text-center mt-1">SARA-1</p>
+                     <div className="mt-4 flex gap-1 items-center">
+                        <div className="w-1 h-3 bg-indigo-500 animate-bounce" style={{ animationDelay: '0s' }}></div>
+                        <div className="w-1 h-5 bg-indigo-400 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-1 h-2 bg-indigo-600 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                     </div>
+                  </div>
+               </motion.div>
+            </div>
+
+            {/* Answer Builder Overlay */}
+            <div className="absolute top-8 left-8 z-20">
+               <div className="glass p-4 w-64">
+                  <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Activity size={10} /> Answer Builder
+                  </h4>
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg text-[9px]">
+                      <span>Situation</span> <CheckCircle size={10} className="text-emerald-500" />
+                    </div>
+                    <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg text-[9px]">
+                      <span>Task</span> <CheckCircle size={10} className="text-emerald-500" />
+                    </div>
+                    <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg text-[9px]">
+                      <span>Action</span> <Activity size={10} className="text-indigo-400 animate-pulse" />
+                    </div>
+                    <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg text-[9px] opacity-40">
+                      <span>Result</span> <div className="w-2 h-2 rounded-full bg-white/20" />
+                    </div>
+                  </div>
+               </div>
+            </div>
+
             {/* Question Overlay */}
             <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
               <AnimatePresence mode='wait'>
@@ -148,15 +266,36 @@ const EliteInterview = () => {
                   {questionData?.text || "Please wait while we load the question..."}
                 </motion.h3>
               </AnimatePresence>
+
+              {/* Live Transcript Display */}
+              {answer && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="mb-6 p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 text-sm text-slate-200 line-clamp-2"
+                >
+                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block mb-1">Transcript Preview</span>
+                  {answer}
+                </motion.div>
+              )}
               
               <div className="flex justify-between items-center">
-                <button 
-                  onClick={handleNext}
-                  disabled={submitting}
-                  className="bg-white text-black font-bold px-8 py-4 rounded-2xl flex items-center gap-2 hover:bg-slate-200 transition-all disabled:opacity-50"
-                >
-                  {submitting ? <Loader2 className="animate-spin" /> : "Next Question"} <ChevronRight size={18} />
-                </button>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={isRecording ? stopRecording : startRecording}
+                    className={`px-8 py-4 rounded-2xl font-bold flex items-center gap-2 transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                  >
+                    {isRecording ? <Square size={18} fill="white" /> : <Mic size={18} />}
+                    {isRecording ? "Stop Recording" : "Speak Answer"}
+                  </button>
+                  <button 
+                    onClick={handleNext}
+                    disabled={submitting || (!answer && !isRecording)}
+                    className="bg-white text-black font-bold px-10 py-4 rounded-2xl flex items-center gap-2 hover:bg-slate-200 transition-all disabled:opacity-50"
+                  >
+                    {submitting ? <Loader2 className="animate-spin" /> : "Next Question"} <ChevronRight size={18} />
+                  </button>
+                </div>
                 
                 <div className="flex items-center gap-4">
                    <div className="text-center px-4">

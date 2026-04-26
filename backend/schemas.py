@@ -30,11 +30,13 @@ class InterviewStart(BaseModel):
     candidate_email: str
     role: str
     skills: List[str]
-    difficulty: str
+    difficulty: Optional[str] = "Adaptive"
     experience: Optional[str] = "Standard"
     interview_type: Optional[str] = "Technical"
     style: Optional[str] = "Professional"
     num_questions: Optional[int] = 5
+    infinite_mode: Optional[bool] = False
+    adaptive_mode: Optional[bool] = True
     audio_mode: Optional[bool] = False
 
 class ResponseCreate(BaseModel):

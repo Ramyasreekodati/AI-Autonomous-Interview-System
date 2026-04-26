@@ -205,6 +205,50 @@ class AIEngine:
         # Return unique questions
         return random.sample(role_questions, min(count, len(role_questions)))
 
+    def generate_next_dynamic_question(self, role, skills, experience, previous_q_and_a=[], adaptive=True):
+        """
+        DYNAMIC FLOW: Generates the next question based on interview history.
+        """
+        if not self.model:
+            return self._get_local_questions(role, 1)[0]
+
+        try:
+            history_context = ""
+            if previous_q_and_a:
+                history_context = "Previous Conversation:\n"
+                for q, a, score in previous_q_and_a:
+                    history_context += f"Q: {q}\nA: {a}\nScore: {score}/10\n---\n"
+
+            adaptive_instruction = (
+                "If adaptive=True, adjust the difficulty of the next question based on the candidate's previous scores. "
+                "If they scored high, make it harder. If they struggled, clarify or simplify."
+            ) if adaptive else ""
+
+            prompt = f"""
+            You are an expert AI interviewer for a {role} position.
+            Candidate Skills: {skills}
+            Candidate Experience: {experience}
+            
+            {history_context}
+            
+            Based on the history and candidate profile, generate the NEXT single interview question.
+            {adaptive_instruction}
+            
+            Guidelines:
+            1. Do NOT repeat previous questions.
+            2. Keep it conversational but technical.
+            3. If this is the first question, start with a strong foundational topic.
+            
+            Return ONLY the question text as a string.
+            """
+            
+            response = self.model.generate_content(prompt)
+            return response.text.strip().strip('"')
+                
+        except Exception as e:
+            print(f"[AIEngine] Dynamic Generation Failure: {str(e)}")
+            return self._get_local_questions(role, 1)[0]
+
     def generate_questions(self, role, skills, difficulty, count, experience, interview_type, style, previous_questions=[]):
         """
         MASTER PROMPT 1: UNIQUE QUESTION GENERATION
@@ -259,15 +303,68 @@ class AIEngine:
 
         return self._get_local_questions(role, count)
 
-    def evaluate_answer(self, question, answer, role="Expert", skills=[]):
+    def analyze_resume_v2(self, resume_text, job_description="Generic"):
         """
-        MASTER PROMPT 2: BEHAVIORAL + TECHNICAL EVALUATION
+        ADVANCED RESUME ANALYZER: Scores based on Readability, Credibility, and ATS Fit.
+        """
+        if not self.model:
+            return {"readability": 70, "credibility": 60, "ats_fit": 50, "feedback": "AI analysis offline."}
+
+        try:
+            prompt = f"""
+            Analyze the following resume against the job context: "{job_description}"
+            Resume: {resume_text}
+            
+            Score the following categories (0-100) and provide specific insights:
+            1. Readability: Clarity, formatting, and grammar.
+            2. Credibility: Evidence of accomplishments (not just tasks).
+            3. ATS Fit: Keyword alignment and structure.
+            
+            Return ONLY a valid JSON object:
+            {{
+                "readability": score,
+                "credibility": score,
+                "ats_fit": score,
+                "strengths": ["list"],
+                "weaknesses": ["list"],
+                "critical_keywords_missing": ["list"],
+                "best_practice_tip": "One key tip"
+            }}
+            """
+            response = self.model.generate_content(prompt)
+            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+        except Exception as e:
+            print(f"[AIEngine] Resume V2 Failure: {str(e)}")
+            
+        return {"readability": 0, "credibility": 0, "ats_fit": 0, "error": "Analysis failed"}
+
+    def evaluate_answer(self, question, answer, role="Expert", skills=[], star_mode=True):
+        """
+        MASTER PROMPT 2: BEHAVIORAL + TECHNICAL + STAR AUDIT
         """
         if not answer:
             return {"score": 0, "strengths": [], "weaknesses": ["No response provided"], "sentiment": {"confidence":0, "clarity":0}}
 
         # 🧬 SYNERGY: Behavioral Analysis
         sentiment = self.analyze_sentiment(answer)
+        
+        # 🎙️ SPEECH ANALYTICS (Filler Words & Pace)
+        filler_words = ["um", "uh", "like", "you know", "actually", "basically", "so"]
+        words = answer.lower().split()
+        filler_count = sum(1 for w in words if w in filler_words)
+        pace = len(words) # Rough proxy for word count
+        
+        filler_feedback = (
+            f"Watch out for filler words. You used '{filler_words}' roughly {filler_count} times. "
+            if filler_count > 3 else "Excellent clarity and minimal filler words."
+        )
+        
+        star_prompt = (
+            "Additionally, audit the response using the STAR method (Situation, Task, Action, Result). "
+            "Identify if any components are missing."
+        ) if star_mode else ""
 
         if not self.model:
             # ELITE LOCAL SEMANTIC ANALYZER
@@ -309,7 +406,14 @@ class AIEngine:
                 "strengths": ["list", "of", "positives"],
                 "weaknesses": ["list", "of", "areas", "to", "improve"],
                 "technical_accuracy": "Detailed feedback on the technical content",
-                "behavioral_feedback": "Critique on confidence, tone, and communication"
+                "behavioral_feedback": "Critique on confidence, tone, and communication",
+                "star_audit": {
+                    "situation": "Present/Missing",
+                    "task": "Present/Missing",
+                    "action": "Present/Missing",
+                    "result": "Present/Missing",
+                    "critique": "Brief comment on STAR structure"
+                }
             }}
             """
             
@@ -317,11 +421,16 @@ class AIEngine:
             json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
             if json_match:
                 result = json.loads(json_match.group())
-                # Merge sentiment data for reporting
+                result["behavioral_feedback"] = f"{result.get('behavioral_feedback', '')} {filler_feedback}"
+                result["speech_metrics"] = {
+                    "filler_count": filler_count,
+                    "pace": "Optimal" if 100 < pace < 160 else "Fast" if pace >= 160 else "Slow",
+                    "word_count": pace
+                }
                 result["sentiment"] = sentiment
                 return result
         except Exception as e:
-            st.error(f"Evaluation Failure: {str(e)}")
+            print(f"[AIEngine] Evaluation Failure: {str(e)}")
             
         return {"score": 5, "strengths": ["Attempted"], "weaknesses": ["AI evaluation failed"], "sentiment": sentiment}
 

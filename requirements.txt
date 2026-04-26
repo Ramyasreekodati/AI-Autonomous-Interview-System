@@ -10,3 +10,4 @@ pydub
 opencv-python
 mediapipe
 numpy
+PyPDF2

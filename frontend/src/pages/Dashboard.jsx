@@ -20,33 +20,32 @@ const Dashboard = () => {
     name: '',
     email: '',
     role: 'Software Engineer',
-    skills: ['Python'],
-    difficulty: 'Medium',
-    experience: '3-5 years',
-    style: 'Scenario-Based',
+    skills: [],
+    skillInput: '',
+    experience: 'Intermediate',
+    infiniteMode: false,
+    adaptiveAI: true,
     numQuestions: 5
   });
 
-  const roles = [
-    'Software Engineer',
-    'Data Scientist',
-    'Frontend Developer',
-    'ML Engineer',
-    'Backend Developer',
-    'Full Stack Developer'
-  ];
-
-  const skillOptions = [
-    'Python', 'React', 'SQL', 'Java', 'Machine Learning', 
-    'Deep Learning', 'FastAPI', 'Node.js', 'Docker', 'AWS'
-  ];
-
-  const handleSkillToggle = (skill) => {
-    if (formData.skills.includes(skill)) {
-      setFormData({ ...formData, skills: formData.skills.filter(s => s !== skill) });
-    } else {
-      setFormData({ ...formData, skills: [...formData.skills, skill] });
+  const handleSkillAdd = (e) => {
+    if (e.key === 'Enter' && formData.skillInput.trim()) {
+      if (!formData.skills.includes(formData.skillInput.trim())) {
+        setFormData({
+          ...formData,
+          skills: [...formData.skills, formData.skillInput.trim()],
+          skillInput: ''
+        });
+      }
+      e.preventDefault();
     }
+  };
+
+  const removeSkill = (skillToRemove) => {
+    setFormData({
+      ...formData,
+      skills: formData.skills.filter(s => s !== skillToRemove)
+    });
   };
 
   const startInterview = async () => {
@@ -61,10 +60,10 @@ const Dashboard = () => {
         candidate_email: formData.email,
         role: formData.role,
         skills: formData.skills,
-        difficulty: formData.difficulty,
         experience: formData.experience,
-        style: formData.style,
-        num_questions: formData.numQuestions
+        num_questions: formData.numQuestions,
+        infinite_mode: formData.infiniteMode,
+        adaptive_mode: formData.adaptiveAI
       });
       navigate(`/interview/${response.data.interview_id}`);
     } catch (error) {
@@ -80,7 +79,7 @@ const Dashboard = () => {
       <div className="flex justify-between items-center mb-8 bg-gradient-to-r from-blue-600/5 to-purple-600/5 p-6 rounded-3xl border border-white">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Main Dashboard</h2>
-          <p className="text-sm text-gray-500">Core assessment system 1.0</p>
+          <p className="text-sm text-gray-500">AI-Driven Autonomous System 2.0</p>
         </div>
         <button 
           onClick={() => navigate('/elite/dashboard')}
@@ -99,7 +98,7 @@ const Dashboard = () => {
           <div className="premium-card">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
               <Settings className="text-blue-500 w-5 h-5" />
-              Campaign Setup
+              Dynamic Setup
             </h2>
             
             <div className="space-y-4">
@@ -118,114 +117,93 @@ const Dashboard = () => {
               </div>
 
               <div>
-                <label className="input-label">Work Email</label>
+                <label className="input-label">Target Role</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
+                  <Briefcase className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
                   <input 
-                    type="email" 
+                    type="text" 
                     className="input-field pl-10" 
-                    placeholder="name@company.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    placeholder="e.g. Senior Fullstack Engineer"
+                    value={formData.role}
+                    onChange={(e) => setFormData({...formData, role: e.target.value})}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="input-label">Target Role</label>
-                  <div className="relative">
-                    <Briefcase className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
-                    <select 
-                      className="input-field pl-10 appearance-none bg-white"
-                      value={formData.role}
-                      onChange={(e) => setFormData({...formData, role: e.target.value})}
-                    >
-                      {roles.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="input-label">Difficulty Level</label>
-                  <div className="relative">
-                    <BarChart className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
-                    <select 
-                      className="input-field pl-10 appearance-none bg-white"
-                      value={formData.difficulty}
-                      onChange={(e) => setFormData({...formData, difficulty: e.target.value})}
-                    >
-                      <option value="Basic">Basic</option>
-                      <option value="Standard">Standard</option>
-                      <option value="Elite">Elite</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="input-label">Experience</label>
-                  <select 
-                    className="input-field appearance-none bg-white"
-                    value={formData.experience}
-                    onChange={(e) => setFormData({...formData, experience: e.target.value})}
-                  >
-                    <option value="Fresher">Fresher</option>
-                    <option value="1-3 years">1-3 years</option>
-                    <option value="3-5 years">3-5 years</option>
-                    <option value="5+ years">5+ years</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="input-label">Style</label>
-                  <select 
-                    className="input-field appearance-none bg-white"
-                    value={formData.style}
-                    onChange={(e) => setFormData({...formData, style: e.target.value})}
-                  >
-                    <option value="Conceptual">Conceptual</option>
-                    <option value="Scenario-Based">Scenario-Based</option>
-                    <option value="Coding">Coding</option>
-                    <option value="Mixed">Mixed</option>
-                  </select>
-                </div>
-              </div>
-
               <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="input-label mb-0">Questions Count</label>
-                  <span className="text-blue-600 font-bold text-sm bg-blue-50 px-2 py-0.5 rounded-full">{formData.numQuestions}</span>
-                </div>
+                <label className="input-label">Experience Level</label>
                 <input 
-                  type="range" 
-                  min="1" max="20" 
-                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  value={formData.numQuestions}
-                  onChange={(e) => setFormData({...formData, numQuestions: parseInt(e.target.value)})}
+                  type="text" 
+                  className="input-field" 
+                  placeholder="e.g. 5 years, Expert, or Student"
+                  value={formData.experience}
+                  onChange={(e) => setFormData({...formData, experience: e.target.value})}
                 />
               </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-gray-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-slate-700">Adaptive AI</p>
+                    <p className="text-[10px] text-slate-500">AI adjusts difficulty in real-time</p>
+                  </div>
+                  <button 
+                    onClick={() => setFormData({...formData, adaptiveAI: !formData.adaptiveAI})}
+                    className={`w-12 h-6 rounded-full transition-all relative ${formData.adaptiveAI ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.adaptiveAI ? 'left-7' : 'left-1'}`}></div>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-slate-700">Infinite Mode ♾️</p>
+                    <p className="text-[10px] text-slate-500">Session ends only when you stop</p>
+                  </div>
+                  <button 
+                    onClick={() => setFormData({...formData, infiniteMode: !formData.infiniteMode})}
+                    className={`w-12 h-6 rounded-full transition-all relative ${formData.infiniteMode ? 'bg-purple-600' : 'bg-gray-300'}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.infiniteMode ? 'left-7' : 'left-1'}`}></div>
+                  </button>
+                </div>
+              </div>
+
+              {!formData.infiniteMode && (
+                <div>
+                  <label className="input-label">Question Count</label>
+                  <input 
+                    type="number" 
+                    className="input-field" 
+                    value={formData.numQuestions}
+                    onChange={(e) => setFormData({...formData, numQuestions: parseInt(e.target.value)})}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
           <div className="premium-card">
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <Code className="w-4 h-4" /> Specializations
+              <Code className="w-4 h-4" /> Skills & Specializations
             </h3>
-            <div className="flex flex-wrap gap-2">
-              {skillOptions.map(skill => (
-                <button
-                  key={skill}
-                  onClick={() => handleSkillToggle(skill)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                    formData.skills.includes(skill)
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-200 ring-2 ring-blue-100'
-                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
-                  }`}
-                >
-                  {skill}
-                </button>
-              ))}
+            <div className="space-y-3">
+              <input 
+                type="text" 
+                className="input-field" 
+                placeholder="Type skill and press Enter"
+                value={formData.skillInput}
+                onChange={(e) => setFormData({...formData, skillInput: e.target.value})}
+                onKeyDown={handleSkillAdd}
+              />
+              <div className="flex flex-wrap gap-2">
+                {formData.skills.map(skill => (
+                  <span key={skill} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold border border-blue-100 flex items-center gap-2">
+                    {skill}
+                    <button onClick={() => removeSkill(skill)} className="hover:text-red-500">×</button>
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         </div>

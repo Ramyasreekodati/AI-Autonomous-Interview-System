@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InterviewAI Elite | Master Your Future</title>
+    <meta name="description" content="AI-powered interview coaching and mock practice platform for professional success.">
+    <link rel="stylesheet" href="index.css">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fas fa-brain"></i>
+                <span>InterviewAI</span>
+            </div>
+            <nav class="nav-links">
+                <ul>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link active" onclick="showView('landing')">
+                            <i class="fas fa-home"></i> Home
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" onclick="showView('dashboard')">
+                            <i class="fas fa-chart-line"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" onclick="openSetupModal()">
+                            <i class="fas fa-video"></i> Practice Room
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" onclick="showView('lessons')">
+                            <i class="fas fa-book-open"></i> Curriculum
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" onclick="showView('resume')">
+                            <i class="fas fa-file-alt"></i> Resume AI
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="glass" style="padding: 1rem; margin-top: auto;">
+                    <p style="font-size: 0.8rem; margin-bottom: 0.5rem;">Pro Plan Active</p>
+                    <div style="height: 4px; background: var(--glass-border); border-radius: 2px;">
+                        <div style="width: 75%; height: 100%; background: var(--accent-teal); border-radius: 2px;"></div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content" id="main-view">
+            <!-- Landing View (Default) -->
+            <section id="view-landing" class="animate-fade">
+                <div class="hero" style="padding: var(--spacing-xl) 0;">
+                    <h1 style="margin-bottom: var(--spacing-md);">Practice makes <br><span style="color: var(--accent-teal);">Placement.</span></h1>
+                    <p style="font-size: 1.2rem; max-width: 600px; margin-bottom: var(--spacing-lg);">
+                        Don't just read advice. Practice with our state-of-the-art AI Interview Coach. Get real-time feedback on your pace, confidence, and content.
+                    </p>
+                    <div style="display: flex; gap: var(--spacing-md);">
+                        <button class="btn btn-primary" onclick="openSetupModal()">
+                            Start Mock Interview <i class="fas fa-arrow-right"></i>
+                        </button>
+                        <button class="btn btn-outline">Explore Lessons</button>
+                    </div>
+                </div>
+
+                <!-- Feature Grid -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--spacing-lg); margin-top: var(--spacing-xl);">
+                    <div class="glass" style="padding: var(--spacing-lg);">
+                        <i class="fas fa-microphone-alt" style="font-size: 2rem; color: var(--accent-teal); margin-bottom: 1rem;"></i>
+                        <h3>AI Feedback</h3>
+                        <p>Analyze your speech patterns, filler words, and delivery speed in real-time.</p>
+                    </div>
+                    <div class="glass" style="padding: var(--spacing-lg);">
+                        <i class="fas fa-robot" style="font-size: 2rem; color: var(--accent-blue); margin-bottom: 1rem;"></i>
+                        <h3>Custom Questions</h3>
+                        <p>1,000+ questions tailored to Industry, Role, and Seniority levels.</p>
+                    </div>
+                    <div class="glass" style="padding: var(--spacing-lg);">
+                        <i class="fas fa-file-shield" style="font-size: 2rem; color: var(--accent-purple); margin-bottom: 1rem;"></i>
+                        <h3>Resume ATS Score</h3>
+                        <p>Scan your resume against job descriptions to identify critical keyword gaps.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Dashboard View -->
+            <section id="view-dashboard" style="display: none;" class="animate-fade">
+                <header style="margin-bottom: var(--spacing-lg);">
+                    <h2>Your Preparation Dashboard</h2>
+                    <p>Consistency is the key to success. You've practiced 4 days this week!</p>
+                </header>
+
+                <div class="stats-grid">
+                    <div class="glass metric-card">
+                        <div class="progress-circle"></div>
+                        <p>Weekly Goal</p>
+                    </div>
+                    <div class="glass metric-card">
+                        <div class="metric-value" id="dash-sessions">12</div>
+                        <p>Sessions Completed</p>
+                    </div>
+                    <div class="glass metric-card">
+                        <div class="metric-value" id="dash-confidence" style="color: var(--accent-blue);">84%</div>
+                        <p>Average Confidence</p>
+                    </div>
+                    <div class="glass metric-card">
+                        <div class="metric-value" id="dash-grade" style="color: var(--accent-purple);">A-</div>
+                        <p>Current Grade</p>
+                    </div>
+                </div>
+
+                <div style="margin-top: var(--spacing-xl); display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-lg);">
+                    <div class="glass" style="padding: var(--spacing-lg);">
+                        <h3>Recent Activity</h3>
+                        <div style="margin-top: 1rem;">
+                            <div class="course-card glass">
+                                <i class="fas fa-play-circle" style="color: var(--accent-teal);"></i>
+                                <div>
+                                    <h4 style="margin:0">Behavioral Interviewing 101</h4>
+                                    <p style="font-size: 0.8rem; margin:0">Completed 15 mins ago</p>
+                                </div>
+                            </div>
+                            <div class="course-card glass">
+                                <i class="fas fa-video" style="color: var(--accent-blue);"></i>
+                                <div>
+                                    <h4 style="margin:0">Mock Interview: Senior SWE</h4>
+                                    <p style="font-size: 0.8rem; margin:0">Completed yesterday</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass" style="padding: var(--spacing-lg);">
+                        <h3>Next Up</h3>
+                        <p style="margin-bottom: 1rem;">Recommended for you</p>
+                        <button class="btn btn-primary" style="width: 100%;">Mastering Body Language</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Interview Room View -->
+            <section id="view-interview" style="display: none;" class="animate-fade">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
+                    <div>
+                        <h2>AI Mock Interview</h2>
+                        <p>Session: General Behavioral</p>
+                    </div>
+                    <button class="btn btn-outline" onclick="showView('dashboard')">Exit Session</button>
+                </div>
+
+                <div class="interview-container">
+                    <div class="video-wrapper">
+                        <video id="webcam-preview" autoplay muted playsinline></video>
+                        <div class="question-overlay">
+                            <h3 id="current-question" class="animate-fade">Tell me about a time you faced a significant challenge at work and how you handled it.</h3>
+                            <div style="display:flex;gap:0.5rem;margin-top:1rem;justify-content:center;flex-wrap:wrap;">
+                                <span id="question-progress" style="font-size:0.85rem;color:var(--text-secondary);align-self:center;">Question 1 of 5</span>
+                                <button id="btn-next-question" class="btn btn-primary" onclick="nextQuestion()">Next Question <i class="fas fa-chevron-right"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metrics-panel">
+                        <div class="glass metric-card">
+                            <h3>Live Analysis</h3>
+                            <p style="font-size: 0.8rem;">Processing delivery metrics...</p>
+                        </div>
+                        <div class="glass metric-card">
+                            <p>Speaking Pace</p>
+                            <div class="metric-value" id="metric-pace">145 WPM</div>
+                            <p style="font-size: 0.7rem; color: var(--accent-teal);">Optimal Range</p>
+                        </div>
+                        <div class="glass metric-card">
+                            <p>Confidence Score</p>
+                            <div class="metric-value" id="metric-conf" style="color: var(--accent-blue);">88%</div>
+                            <p style="font-size: 0.7rem;">Stable Eye Contact</p>
+                        </div>
+                        <div class="glass metric-card">
+                            <p>Filler Words</p>
+                            <div class="metric-value" id="metric-fillers" style="color: var(--accent-purple);">2</div>
+                            <p style="font-size: 0.7rem;">"Um", "Uh", "Like"</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Answer Input Area -->
+                <div class="glass" style="margin-top:var(--spacing-md);padding:var(--spacing-md);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+                        <h4 style="color:var(--text-primary);"><i class="fas fa-keyboard"></i> Your Answer</h4>
+                        <div style="display:flex;gap:0.5rem;">
+                            <button id="btn-record" class="btn btn-outline" onclick="toggleRecording()"><i class="fas fa-microphone"></i> Record</button>
+                            <button id="btn-submit-answer" class="btn btn-primary" onclick="submitAnswer()">Submit <i class="fas fa-paper-plane"></i></button>
+                        </div>
+                    </div>
+                    <textarea id="answer-input" placeholder="Type your answer here, or click Record to speak..." style="width:100%;min-height:110px;background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:12px;padding:1rem;color:var(--text-primary);font-family:'Outfit',sans-serif;font-size:1rem;resize:vertical;outline:none;"></textarea>
+                    <div id="ai-feedback" style="display:none;margin-top:1rem;"></div>
+                </div>
+            </section>
+            <!-- Curriculum / Lessons View -->
+            <section id="view-lessons" style="display: none;" class="animate-fade">
+                <header style="margin-bottom: var(--spacing-lg);">
+                    <h2>Interview Curriculum</h2>
+                    <p>Structured lessons to sharpen every aspect of your interview performance.</p>
+                </header>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--spacing-lg);">
+                    <div class="glass" style="padding:var(--spacing-lg);">
+                        <i class="fas fa-comments" style="font-size:2rem;color:var(--accent-teal);margin-bottom:1rem;"></i>
+                        <h3>Behavioral Mastery</h3>
+                        <p>Master STAR-method answers for behavioral questions asked at top companies.</p>
+                        <button class="btn btn-outline" style="margin-top:1rem;width:100%;">Start Lesson</button>
+                    </div>
+                    <div class="glass" style="padding:var(--spacing-lg);">
+                        <i class="fas fa-code" style="font-size:2rem;color:var(--accent-blue);margin-bottom:1rem;"></i>
+                        <h3>Technical Deep Dive</h3>
+                        <p>Data structures, system design, and coding patterns for engineering roles.</p>
+                        <button class="btn btn-outline" style="margin-top:1rem;width:100%;">Start Lesson</button>
+                    </div>
+                    <div class="glass" style="padding:var(--spacing-lg);">
+                        <i class="fas fa-user-tie" style="font-size:2rem;color:var(--accent-purple);margin-bottom:1rem;"></i>
+                        <h3>Body Language & Tone</h3>
+                        <p>Control your posture, eye contact, and voice modulation under pressure.</p>
+                        <button class="btn btn-outline" style="margin-top:1rem;width:100%;">Start Lesson</button>
+                    </div>
+                    <div class="glass" style="padding:var(--spacing-lg);">
+                        <i class="fas fa-handshake" style="font-size:2rem;color:var(--accent-teal);margin-bottom:1rem;"></i>
+                        <h3>Salary Negotiation</h3>
+                        <p>Confidently negotiate offers with proven frameworks and real scripts.</p>
+                        <button class="btn btn-outline" style="margin-top:1rem;width:100%;">Start Lesson</button>
+                    </div>
+                </div>
+            </section>
+            <!-- Resume AI View -->
+            <section id="view-resume" style="display: none;" class="animate-fade">
+                <h2>Resume Intelligence</h2>
+                <p>Optimize your resume for Applicant Tracking Systems (ATS)</p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-lg); margin-top: var(--spacing-lg);">
+                    <div class="glass" style="padding: var(--spacing-lg); border: 2px dashed var(--glass-border); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px;">
+                        <i class="fas fa-cloud-upload-alt" style="font-size: 3rem; color: var(--accent-blue); margin-bottom: 1rem;"></i>
+                        <h3>Drop your Resume here</h3>
+                        <p>PDF or DOCX (Max 5MB)</p>
+                        <input type="file" id="resume-upload" accept=".pdf,.docx" style="display:none;" onchange="uploadResume(event)">
+                        <button id="btn-select-resume" class="btn btn-outline" style="margin-top: 1rem;" onclick="document.getElementById('resume-upload').click()">Select File</button>
+                    </div>
+
+                    <div class="glass" style="padding: var(--spacing-lg);">
+                        <h3>ATS Analysis Report</h3>
+                        <div style="margin-top: 1.5rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span>Keyword Match</span>
+                                <span id="ats-keyword" style="color: var(--accent-teal);">72%</span>
+                            </div>
+                            <div style="height: 8px; background: var(--glass-border); border-radius: 4px; margin-bottom: 1.5rem;">
+                                <div id="ats-keyword-bar" style="width: 72%; height: 100%; background: var(--accent-teal); border-radius: 4px; transition: width 0.8s ease;"></div>
+                            </div>
+
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span>Formatting Score</span>
+                                <span id="ats-format" style="color: var(--accent-blue);">95%</span>
+                            </div>
+                            <div style="height: 8px; background: var(--glass-border); border-radius: 4px; margin-bottom: 1.5rem;">
+                                <div id="ats-format-bar" style="width: 95%; height: 100%; background: var(--accent-blue); border-radius: 4px; transition: width 0.8s ease;"></div>
+                            </div>
+
+                            <div class="glass" style="padding: 1rem; background: rgba(16, 185, 129, 0.1);">
+                                <h4 style="color: var(--accent-teal); margin-bottom: 0.5rem;"><i class="fas fa-check-circle"></i> Insight</h4>
+                                <p id="ats-insight" style="font-size: 0.9rem; color: var(--text-primary);">Your "Skills" section is well-structured. Consider adding more metrics to your "Experience" bullets.</p>
+                                <p id="ats-missing" style="display:none;font-size:0.8rem;margin-top:0.5rem;color:#FCA5A5;"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Setup Modal -->
+    <div id="setup-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:999;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+        <div class="glass" style="padding:2.5rem;width:100%;max-width:480px;margin:1rem;border-radius:20px;">
+            <h2 style="margin-bottom:0.25rem;"><i class="fas fa-rocket" style="color:var(--accent-teal)"></i> Setup Interview</h2>
+            <p style="margin-bottom:1.5rem;">Configure your AI-powered mock session</p>
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+                <input id="setup-name" type="text" placeholder="Your Full Name" style="background:rgba(255,255,255,0.07);border:1px solid var(--glass-border);border-radius:10px;padding:0.75rem 1rem;color:var(--text-primary);font-family:'Outfit',sans-serif;font-size:1rem;outline:none;">
+                <input id="setup-email" type="email" placeholder="Email Address" style="background:rgba(255,255,255,0.07);border:1px solid var(--glass-border);border-radius:10px;padding:0.75rem 1rem;color:var(--text-primary);font-family:'Outfit',sans-serif;font-size:1rem;outline:none;">
+                <input id="setup-role" type="text" placeholder="Target Role (e.g. Software Engineer)" style="background:rgba(255,255,255,0.07);border:1px solid var(--glass-border);border-radius:10px;padding:0.75rem 1rem;color:var(--text-primary);font-family:'Outfit',sans-serif;font-size:1rem;outline:none;">
+                <input id="setup-skills" type="text" placeholder="Key Skills (comma separated, e.g. Python, React)" style="background:rgba(255,255,255,0.07);border:1px solid var(--glass-border);border-radius:10px;padding:0.75rem 1rem;color:var(--text-primary);font-family:'Outfit',sans-serif;font-size:1rem;outline:none;">
+                <select id="setup-difficulty" style="background:#1E293B;border:1px solid var(--glass-border);border-radius:10px;padding:0.75rem 1rem;color:var(--text-primary);font-family:'Outfit',sans-serif;font-size:1rem;outline:none;">
+                    <option value="Easy">Easy</option>
+                    <option value="Adaptive" selected>Adaptive (Recommended)</option>
+                    <option value="Hard">Hard</option>
+                </select>
+                <div style="display:flex;gap:0.75rem;">
+                    <button class="btn btn-outline" style="flex:1" onclick="closeSetupModal()">Cancel</button>
+                    <button id="btn-begin" class="btn btn-primary" style="flex:2" onclick="beginInterview()">Start Interview <i class="fas fa-arrow-right"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" style="display:none;position:fixed;top:1.5rem;right:1.5rem;z-index:9999;padding:0.9rem 1.4rem;border-radius:12px;border:1px solid var(--glass-border);max-width:360px;align-items:center;gap:0.75rem;" class="glass">
+        <span id="toast-message" style="font-size:0.9rem;"></span>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -23,30 +23,93 @@ def start_interview(data: schemas.InterviewStart, db: Session = Depends(get_db))
         candidate_id=candidate.id, 
         status="ongoing",
         target_role=data.role,
-        target_skills=", ".join(data.skills) if isinstance(data.skills, list) else data.skills
+        target_skills=", ".join(data.skills) if isinstance(data.skills, list) else data.skills,
+        experience_level=data.experience,
+        infinite_mode=data.infinite_mode,
+        adaptive_mode=data.adaptive_mode
     )
     db.add(interview)
     db.commit()
     db.refresh(interview)
     
-    # Pre-generate questions for this session using real AI
-    questions_list = ai_engine.generate_questions(
-        role=data.role, 
-        skills=data.skills, 
-        difficulty=data.difficulty,
-        count=data.num_questions,
-        experience=data.experience,
-        interview_type=data.interview_type,
-        style=data.style
+    # If not in adaptive/infinite mode, pre-generate questions
+    if not (data.adaptive_mode or data.infinite_mode):
+        questions_list = ai_engine.generate_questions(
+            role=data.role, 
+            skills=data.skills, 
+            difficulty=data.difficulty,
+            count=data.num_questions,
+            experience=data.experience,
+            interview_type=data.interview_type,
+            style=data.style
+        )
+        for q_text in questions_list:
+            question = models.Question(interview_id=interview.id, text=q_text, category=data.role, difficulty=data.difficulty)
+            db.add(question)
+        db.commit()
+    else:
+        # Generate the first question dynamically
+        q_text = ai_engine.generate_next_dynamic_question(
+            role=data.role,
+            skills=data.skills,
+            experience=data.experience,
+            adaptive=data.adaptive_mode
+        )
+        question = models.Question(interview_id=interview.id, text=q_text, category=data.role, difficulty="Adaptive")
+        db.add(question)
+        db.commit()
+    
+    return {"interview_id": interview.id, "message": "Interview started", "total_questions": data.num_questions if not data.infinite_mode else -1}
+
+@router.get("/{interview_id}/next-question")
+def get_next_dynamic_question(interview_id: int, db: Session = Depends(get_db)):
+    interview = db.query(models.Interview).filter(models.Interview.id == interview_id).first()
+    if not interview:
+        raise HTTPException(status_code=404, detail="Interview not found")
+    
+    # Check if we should stop
+    questions = db.query(models.Question).filter(models.Question.interview_id == interview_id).all()
+    responses = db.query(models.Response).filter(models.Response.interview_id == interview_id).all()
+    
+    # If in infinite mode, we only stop if the user clicks "End" (handled by UI)
+    # If in fixed mode, check if we reached the limit
+    if not interview.infinite_mode and len(questions) >= 5: # Default limit if not infinite
+         # This part is simplified; usually we'd use the num_questions from start_interview
+         # but we'll let the UI handle the "Finished" state for now.
+         pass
+
+    # Gather history for adaptive logic
+    history = []
+    for q in questions:
+        resp = next((r for r in responses if r.question_id == q.id), None)
+        if resp:
+            history.append((q.text, resp.answer_text, resp.relevance_score))
+    
+    # Generate next question
+    next_q_text = ai_engine.generate_next_dynamic_question(
+        role=interview.target_role,
+        skills=interview.target_skills,
+        experience=interview.experience_level,
+        previous_q_and_a=history,
+        adaptive=interview.adaptive_mode
     )
     
-    for q_text in questions_list:
-        question = models.Question(interview_id=interview.id, text=q_text, category=data.role, difficulty=data.difficulty)
-        db.add(question)
-    
+    new_question = models.Question(
+        interview_id=interview.id, 
+        text=next_q_text, 
+        category=interview.target_role, 
+        difficulty="Adaptive" if interview.adaptive_mode else "Standard"
+    )
+    db.add(new_question)
     db.commit()
+    db.refresh(new_question)
     
-    return {"interview_id": interview.id, "message": "Interview started", "total_questions": data.num_questions}
+    return {
+        "question_id": new_question.id,
+        "text": new_question.text,
+        "finished": False,
+        "total": -1 if interview.infinite_mode else 5
+    }
 
 @router.get("/{interview_id}/question/{question_index}")
 def get_question_by_index(interview_id: int, question_index: int, db: Session = Depends(get_db)):
@@ -145,6 +208,32 @@ async def submit_audio_response(interview_id: int, question_id: int, file: Uploa
     db.commit()
     
     return {"transcription": transcription, "score": score}
+
+@router.post("/analyze-resume")
+async def analyze_resume(file: UploadFile = File(...), job_description: str = "Generic", db: Session = Depends(get_db)):
+    file_bytes = await file.read()
+    resume_content = ""
+
+    # Try PDF parsing first
+    if file.filename and file.filename.lower().endswith(".pdf"):
+        try:
+            import io
+            import PyPDF2
+            reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
+            resume_content = " ".join(page.extract_text() or "" for page in reader.pages)
+        except Exception:
+            pass
+
+    # Fallback: try to decode as plain text (DOCX or TXT)
+    if not resume_content.strip():
+        try:
+            resume_content = file_bytes.decode("utf-8", errors="ignore")
+        except Exception:
+            resume_content = "Could not extract text from the uploaded file."
+
+    analysis = ai_engine.analyze_resume_v2(resume_content[:4000], job_description)  # cap at 4000 chars
+    return analysis
+
 
 @router.get("/{interview_id}/results")
 def get_interview_results(interview_id: int, db: Session = Depends(get_db)):

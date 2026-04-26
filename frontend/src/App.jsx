@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Result from './pages/Result';
 import EliteDashboard from './pages/elite/EliteDashboard';
 import EliteInterview from './pages/elite/EliteInterview';
+import EliteCalibration from './pages/elite/EliteCalibration';
 import './index.css';
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
           {/* Elite Premium Routes */}
           <Route path="/elite/dashboard" element={<EliteDashboard />} />
           <Route path="/elite/interview/:id" element={<EliteInterview />} />
+          <Route path="/elite/calibration" element={<EliteCalibration />} />
         </Routes>
       </div>
     </Router>

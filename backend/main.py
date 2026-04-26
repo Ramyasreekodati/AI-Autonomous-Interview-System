@@ -16,6 +16,25 @@ from typing import List
 
 models.Base.metadata.create_all(bind=engine)
 
+# 🛠️ INTERNAL CONNECTION FIX: Manual Migration
+def run_migrations():
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        columns = [row[1] for row in conn.execute(text("PRAGMA table_info(interviews)")).fetchall()]
+        if "experience_level" not in columns:
+            conn.execute(text("ALTER TABLE interviews ADD COLUMN experience_level VARCHAR"))
+        if "infinite_mode" not in columns:
+            conn.execute(text("ALTER TABLE interviews ADD COLUMN infinite_mode BOOLEAN DEFAULT 0"))
+        if "adaptive_mode" not in columns:
+            conn.execute(text("ALTER TABLE interviews ADD COLUMN adaptive_mode BOOLEAN DEFAULT 1"))
+        conn.commit()
+
+try:
+    run_migrations()
+    print("DEBUG: DATABASE SCHEMA SYNCED SUCCESSFULLY")
+except Exception as e:
+    print(f"DEBUG: MIGRATION WARNING: {str(e)}")
+
 app = FastAPI(title="AI Autonomous Interview System")
 print("DEBUG: MAIN.PY LOADED - AUTH ROUTER INCLUDED")
 
@@ -24,6 +43,9 @@ origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "null",  # Allows requests from file:// (browser sends Origin: null)
 ]
 
 app.add_middleware(

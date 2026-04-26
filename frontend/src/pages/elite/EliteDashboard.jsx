@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   TrendingUp, 
@@ -11,15 +12,30 @@ import {
   Brain,
   LayoutDashboard,
   FileText,
-  BookOpen
+  BookOpen,
+  Search,
+  Filter,
+  Settings,
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
 
 const EliteDashboard = () => {
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const questionCategories = [
+    { title: "Software Engineering", count: 450, icon: "💻" },
+    { title: "Product Management", count: 280, icon: "📦" },
+    { title: "Data Science", count: 320, icon: "📊" },
+    { title: "Design / UX", count: 190, icon: "🎨" }
+  ];
+
   return (
     <div className="flex min-h-screen bg-[#0F172A] text-slate-100 font-['Outfit']">
-      {/* Sidebar - Ported from Elite Design */}
+      {/* Sidebar */}
       <aside className="w-[280px] bg-[#1E293B] p-8 flex flex-col border-r border-white/10 fixed h-full z-50">
-        <div className="flex items-center gap-3 text-2xl font-bold mb-16 bg-gradient-to-r from-white to-[#10B981] bg-clip-text text-transparent">
+        <div className="flex items-center gap-3 text-2xl font-bold mb-16 bg-gradient-to-r from-white to-[#10B981] bg-clip-text text-transparent cursor-pointer" onClick={() => navigate('/')}>
           <Brain className="text-[#10B981] w-8 h-8" />
           <span>InterviewAI</span>
         </div>
@@ -28,17 +44,24 @@ const EliteDashboard = () => {
           <ul className="space-y-2">
             <NavItem icon={<LayoutDashboard size={20} />} label="Home" active />
             <NavItem icon={<Activity size={20} />} label="Dashboard" />
-            <NavItem icon={<Video size={20} />} label="Practice Room" />
-            <NavItem icon={<BookOpen size={20} />} label="Curriculum" />
+            <NavItem icon={<Video size={20} />} label="Practice Room" onClick={() => navigate('/elite/calibration')} />
+            <NavItem icon={<BookOpen size={20} />} label="Question Bank" />
             <NavItem icon={<FileText size={20} />} label="Resume AI" />
           </ul>
         </nav>
 
-        <div className="mt-auto">
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Pro Plan Active</p>
-            <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-              <div className="w-3/4 h-full bg-[#10B981]"></div>
+        <div className="mt-auto space-y-4">
+          <div 
+            onClick={() => navigate('/elite/calibration')}
+            className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-4 cursor-pointer hover:bg-indigo-500/20 transition-all group"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">System Readiness</p>
+              <ShieldCheck size={14} className="text-indigo-400" />
+            </div>
+            <div className="flex items-center gap-2">
+               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+               <span className="text-xs font-bold group-hover:translate-x-1 transition-transform">Ready for Mock</span>
             </div>
           </div>
         </div>
@@ -49,46 +72,84 @@ const EliteDashboard = () => {
         <motion.header 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-12"
+          className="mb-12 flex justify-between items-end"
         >
-          <h1 className="text-4xl font-bold mb-2">Welcome Back, Candidate</h1>
-          <p className="text-slate-400">Consistency is the key to success. You've practiced 4 days this week!</p>
+          <div>
+            <h1 className="text-4xl font-bold mb-2">Elite Command Center</h1>
+            <p className="text-slate-400">Autonomous Interview Intelligence System v2.1</p>
+          </div>
+          <button 
+            onClick={() => navigate('/elite/calibration')}
+            className="bg-white text-slate-950 px-8 py-4 rounded-2xl font-bold flex items-center gap-3 hover:bg-slate-200 transition-all shadow-xl shadow-white/5"
+          >
+            <Zap size={18} className="fill-slate-950" />
+            Start AI Mock Interview
+          </button>
         </motion.header>
+
+        {/* Search Question Library (Big Interview Feature) */}
+        <div className="mb-12 relative group">
+          <div className="absolute -inset-1 bg-gradient-to-r from-[#10B981] to-[#3B82F6] rounded-3xl blur opacity-10 group-hover:opacity-25 transition duration-1000"></div>
+          <div className="relative bg-[#1E293B] border border-white/5 rounded-3xl p-2 flex items-center">
+            <Search className="ml-4 text-slate-500" />
+            <input 
+              type="text" 
+              placeholder="Search 5,000+ technical and behavioral questions..."
+              className="bg-transparent border-none outline-none flex-grow p-4 text-lg placeholder:text-slate-600"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button className="bg-white/5 text-slate-400 px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-white/10 transition-all mr-2 font-semibold">
+              <Filter size={18} /> Filters
+            </button>
+          </div>
+        </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <StatCard label="Weekly Goal" value="75%" type="circle" />
-          <StatCard label="Sessions" value="12" icon={<TrendingUp className="text-[#10B981]" />} />
-          <StatCard label="Confidence" value="84%" icon={<Activity className="text-[#3B82F6]" />} />
-          <StatCard label="Current Grade" value="A-" icon={<Award className="text-[#8B5CF6]" />} />
+          <StatCard label="Technical Depth" value="Elite" icon={<Brain className="text-[#10B981]" />} />
+          <StatCard label="Avg. Score" value="8.4/10" icon={<Award className="text-[#F59E0B]" />} />
+          <StatCard label="Gaze Consistency" value="92%" icon={<Activity className="text-[#3B82F6]" />} />
+          <StatCard label="Integrity Level" value="Safe" icon={<ShieldCheck className="text-[#10B981]" />} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Recent Activity */}
+          {/* Question Categories */}
           <div className="lg:col-span-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8">
-            <h3 className="text-xl font-bold mb-6">Recent Activity</h3>
-            <div className="space-y-4">
-              <ActivityItem 
-                icon={<PlayCircle className="text-[#10B981]" />} 
-                title="Behavioral Interviewing 101" 
-                time="Completed 15 mins ago" 
-              />
-              <ActivityItem 
-                icon={<Video className="text-[#3B82F6]" />} 
-                title="Mock Interview: Senior SWE" 
-                time="Completed yesterday" 
-              />
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-xl font-bold">Curated Libraries</h3>
+              <button className="text-[#10B981] text-sm font-bold hover:underline">View All</button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {questionCategories.map(cat => (
+                <div key={cat.title} className="p-6 bg-white/5 rounded-2xl border border-white/5 hover:border-[#10B981]/30 hover:bg-white/10 transition-all cursor-pointer group">
+                  <div className="text-3xl mb-4 group-hover:scale-110 transition-transform">{cat.icon}</div>
+                  <h4 className="font-bold text-lg mb-1">{cat.title}</h4>
+                  <p className="text-xs text-slate-500">{cat.count} Professional Questions</p>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Next Up */}
+          {/* Activity Feed */}
           <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 flex flex-col">
-            <h3 className="text-xl font-bold mb-2">Next Up</h3>
-            <p className="text-slate-400 text-sm mb-8">Recommended for your progress</p>
+            <h3 className="text-xl font-bold mb-2">Resume Intelligence</h3>
+            <p className="text-slate-400 text-sm mb-8">ATS Analysis & Feedback</p>
             
+            <div className="space-y-4 mb-8">
+              <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl">
+                <span className="text-sm">Readability</span>
+                <span className="font-bold text-emerald-400">92%</span>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl">
+                <span className="text-sm">Credibility</span>
+                <span className="font-bold text-blue-400">84%</span>
+              </div>
+            </div>
+
             <div className="mt-auto">
-              <button className="w-full bg-gradient-to-r from-[#3B82F6] to-[#10B981] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-blue-500/20 transition-all">
-                Mastering Body Language <ArrowRight size={18} />
+              <button className="w-full bg-white/5 border border-white/10 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-white/10 transition-all">
+                Upload New Resume <FileText size={18} />
               </button>
             </div>
           </div>
@@ -98,43 +159,25 @@ const EliteDashboard = () => {
   );
 };
 
-const NavItem = ({ icon, label, active = false }) => (
+const NavItem = ({ icon, label, active = false, onClick }) => (
   <li>
-    <a href="#" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${active ? 'bg-white/5 text-white border-l-4 border-[#10B981]' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
+    <div 
+      onClick={onClick}
+      className={`flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer ${active ? 'bg-white/5 text-white border-l-4 border-[#10B981]' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+    >
       {icon}
       <span className="font-semibold">{label}</span>
-    </a>
+    </div>
   </li>
 );
 
-const StatCard = ({ label, value, icon, type = "default" }) => (
-  <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 flex flex-col items-center justify-center">
-    {type === "circle" ? (
-      <div className="relative w-24 h-24 mb-4">
-        <svg className="w-full h-full transform -rotate-90">
-          <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-white/10" />
-          <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray="251.2" strokeDashoffset={251.2 * 0.25} className="text-[#10B981]" />
-        </svg>
-        <span className="absolute inset-0 flex items-center justify-center font-bold text-xl">{value}</span>
-      </div>
-    ) : (
-      <div className="text-3xl font-bold mb-2 flex items-center gap-3">
-        {value}
-      </div>
-    )}
-    <p className="text-slate-400 text-sm font-semibold uppercase tracking-widest">{label}</p>
-  </div>
-);
-
-const ActivityItem = ({ icon, title, time }) => (
-  <div className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/5 transition-all cursor-pointer group">
-    <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+const StatCard = ({ label, value, icon }) => (
+  <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 flex flex-col items-center justify-center group hover:bg-white/10 transition-all">
+    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
       {icon}
     </div>
-    <div>
-      <h4 className="font-bold">{title}</h4>
-      <p className="text-xs text-slate-400">{time}</p>
-    </div>
+    <div className="text-2xl font-bold mb-1">{value}</div>
+    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">{label}</p>
   </div>
 );
 
