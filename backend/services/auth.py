@@ -1,10 +1,13 @@
+import os
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from typing import Optional
 
-# Setup
-SECRET_KEY = "SUPER_SECRET_KEY_FOR_AI_INTERVIEW_SYSTEM"
+# Setup — SECRET_KEY must be set in .env, never hardcoded
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "CHANGE_ME_IN_PRODUCTION_ENV")
+if SECRET_KEY == "CHANGE_ME_IN_PRODUCTION_ENV":
+    print("[AUTH] WARNING: JWT_SECRET_KEY not set in .env — using insecure default!")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -30,5 +33,13 @@ class AuthService:
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
+
+    @staticmethod
+    def verify_token(token: str):
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            return payload
+        except JWTError:
+            return None
 
 auth_service = AuthService()

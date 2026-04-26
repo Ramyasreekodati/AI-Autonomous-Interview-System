@@ -22,10 +22,20 @@ class SurveillanceService:
             "book_detected": "medium"
         }
 
+    def _save_alerts(self, alerts, interview_id, db):
+        if not (interview_id and db): return
+        import models
+        for alert in alerts:
+            db_alert = models.Alert(
+                interview_id=interview_id,
+                alert_type=alert["alert_type"],
+                severity=alert["severity"]
+            )
+            db.add(db_alert)
+        db.commit()
+
     def process_frame(self, frame_bytes, interview_id, db):
-        """
-        FASTAPI INTEGRATION: Process raw bytes and log to DB.
-        """
+        """FASTAPI INTEGRATION"""
         try:
             nparr = np.frombuffer(frame_bytes, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -34,49 +44,19 @@ class SurveillanceService:
             return {"status": "error", "message": "Invalid image data", "alerts": []}
 
         alerts, emotion, gaze = self._analyze(rgb_img)
-        
-        # Save to DB if interview_id is provided
-        if interview_id and db:
-            import models
-            for alert in alerts:
-                db_alert = models.Alert(
-                    interview_id=interview_id,
-                    alert_type=alert["alert_type"],
-                    severity=alert["severity"]
-                )
-                db.add(db_alert)
-            db.commit()
+        self._save_alerts(alerts, interview_id, db)
 
-        return {
-            "alerts": alerts,
-            "emotion": emotion,
-            "gaze": gaze,
-            "status": "success"
-        }
+        return {"alerts": alerts, "emotion": emotion, "gaze": gaze, "status": "success"}
 
     def process_frame_signals(self, image_data, interview_id=None, db=None):
-        """
-        STREAMLIT INTEGRATION: Process UploadedFile with optional DB persistence.
-        """
+        """STREAMLIT INTEGRATION"""
         if image_data is None: return [], "Normal", "Center"
         try:
             file_bytes = np.frombuffer(image_data.getvalue(), np.uint8)
             img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
             rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             alerts, emotion, gaze = self._analyze(rgb_img)
-            
-            # 🛡️ INTEGRATION FIX: Persist alerts even from UI stream
-            if interview_id and db:
-                import models
-                for alert in alerts:
-                    db_alert = models.Alert(
-                        interview_id=interview_id,
-                        alert_type=alert["alert_type"],
-                        severity=alert["severity"]
-                    )
-                    db.add(db_alert)
-                db.commit()
-                
+            self._save_alerts(alerts, interview_id, db)
             return alerts, emotion, gaze
         except:
             return [], "Error", "Unknown"

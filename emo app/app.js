@@ -3,7 +3,9 @@ const API_BASE = 'http://localhost:8000';
 
 // ── App State ─────────────────────────────────────────────────────────────────
 const state = {
+    candidateName: '',
     interviewId: null,
+    accessToken: null,
     currentQuestionId: null,
     currentQuestionIndex: 0,
     totalQuestions: 5,
@@ -98,6 +100,13 @@ function startProctoring() {
     }, 3000);
 }
 
+// ── Sanitize text before inserting into HTML (prevent XSS) ──────────────────
+function safe(str) {
+    const d = document.createElement('div');
+    d.textContent = str ?? '';
+    return d.innerHTML;
+}
+
 // ── Begin Interview ───────────────────────────────────────────────────────────
 async function beginInterview() {
     const name = document.getElementById('setup-name').value.trim();
@@ -113,6 +122,10 @@ async function beginInterview() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
     btn.disabled = true;
 
+    // Stop any existing session cleanly before starting a new one
+    stopCamera();
+    state.interviewId = null;
+
     try {
         const res = await fetch(`${API_BASE}/interview/start`, {
             method: 'POST',
@@ -123,6 +136,9 @@ async function beginInterview() {
         const data = await res.json();
 
         state.interviewId = data.interview_id;
+        state.accessToken = data.access_token;
+        
+        showToast('🚀 Interview started!', 'success');
         state.currentQuestionIndex = 0;
         state.totalQuestions = data.total_questions > 0 ? data.total_questions : 5;
 
@@ -149,7 +165,9 @@ async function loadQuestion(index) {
     questionEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating question...';
 
     try {
-        const res = await fetch(`${API_BASE}/interview/${state.interviewId}/question/${index}`);
+        const res = await fetch(`${API_BASE}/interview/${state.interviewId}/question/${index}`, {
+            headers: { 'Authorization': `Bearer ${state.accessToken}` }
+        });
         const data = await res.json();
 
         if (data.finished) {
@@ -198,8 +216,17 @@ async function submitAnswer() {
     btn.disabled = true;
 
     try {
-        const url = `${API_BASE}/interview/${state.interviewId}/submit-response?question_id=${state.currentQuestionId}&answer_text=${encodeURIComponent(answer)}`;
-        const res = await fetch(url, { method: 'POST' });
+        const res = await fetch(`${API_BASE}/interview/${state.interviewId}/submit-response`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.accessToken}`
+            },
+            body: JSON.stringify({
+                question_id: state.currentQuestionId,
+                answer_text: answer
+            })
+        });
         if (!res.ok) throw new Error(`Server error ${res.status}`);
         const result = await res.json();
 
@@ -227,10 +254,12 @@ function renderFeedback(result) {
     const panel = document.getElementById('ai-feedback');
     const score = result.score ?? 0;
     const color = score >= 8 ? 'var(--accent-teal)' : score >= 5 ? 'var(--accent-blue)' : '#EF4444';
-    const strengths = (result.strengths || []).map(s => `<li>✅ ${s}</li>`).join('');
-    const weaknesses = (result.weaknesses || []).map(w => `<li style="color:#FCA5A5">⚠️ ${w}</li>`).join('');
+    const strengths = (result.strengths || []).map(s => `<li>✅ ${safe(s)}</li>`).join('');
+    const weaknesses = (result.weaknesses || []).map(w => `<li style="color:#FCA5A5">⚠️ ${safe(w)}</li>`).join('');
+    const bfText = safe(result.behavioral_feedback ?? '');
+    const tone = safe(result.sentiment?.tone ?? '');
     const star = result.star_audit ? `<p style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.5rem">
-        STAR: S:${result.star_audit.situation} · T:${result.star_audit.task} · A:${result.star_audit.action} · R:${result.star_audit.result}</p>` : '';
+        STAR: S:${safe(result.star_audit.situation)} · T:${safe(result.star_audit.task)} · A:${safe(result.star_audit.action)} · R:${safe(result.star_audit.result)}</p>` : '';
 
     panel.innerHTML = `
         <div style="display:grid;grid-template-columns:80px 1fr;gap:1rem;align-items:start;padding:1rem;background:rgba(255,255,255,0.04);border-radius:12px;border:1px solid var(--glass-border);">
@@ -241,7 +270,7 @@ function renderFeedback(result) {
             <div>
                 <ul style="list-style:none;padding:0;margin:0 0 0.4rem;font-size:0.85rem">${strengths}</ul>
                 <ul style="list-style:none;padding:0;margin:0;font-size:0.85rem">${weaknesses}</ul>
-                ${result.behavioral_feedback ? `<p style="font-size:0.8rem;margin-top:0.4rem;color:var(--text-secondary)">${result.behavioral_feedback}</p>` : ''}
+                ${bfText ? `<p style="font-size:0.8rem;margin-top:0.4rem;color:var(--text-secondary)">${bfText}</p>` : ''}
                 ${star}
             </div>
         </div>`;
@@ -281,7 +310,11 @@ async function submitAudioAnswer(blob) {
     const form = new FormData();
     form.append('file', blob, 'answer.webm');
     try {
-        const res = await fetch(`${API_BASE}/interview/${state.interviewId}/submit-audio?question_id=${state.currentQuestionId}`, { method: 'POST', body: form });
+        const res = await fetch(`${API_BASE}/interview/${state.interviewId}/submit-audio?question_id=${state.currentQuestionId}`, { 
+            method: 'POST', 
+            headers: { 'Authorization': `Bearer ${state.accessToken}` },
+            body: form 
+        });
         const data = await res.json();
         if (data.transcription) {
             document.getElementById('answer-input').value = data.transcription;
@@ -340,7 +373,9 @@ async function uploadResume(event) {
 async function loadResults() {
     if (!state.interviewId) return;
     try {
-        const res = await fetch(`${API_BASE}/interview/${state.interviewId}/results`);
+        const res = await fetch(`${API_BASE}/interview/${state.interviewId}/results`, {
+            headers: { 'Authorization': `Bearer ${state.accessToken}` }
+        });
         if (!res.ok) return;
         const data = await res.json();
 

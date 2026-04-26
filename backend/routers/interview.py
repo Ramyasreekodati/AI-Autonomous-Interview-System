@@ -1,14 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Header
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from database import get_db
 import models, schemas
 from services.ai_engine import ai_engine
 from services.scoring import scoring_service
+from services.auth import auth_service
 import os
 import datetime
 from typing import List
 
 router = APIRouter(prefix="/interview", tags=["interview"])
+
+def get_current_interview(authorization: str = Header(...)):
+    token = authorization.replace("Bearer ", "")
+    payload = auth_service.verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired session token")
+    return payload["interview_id"]
 
 @router.post("/start")
 def start_interview(data: schemas.InterviewStart, db: Session = Depends(get_db)):
@@ -59,10 +68,20 @@ def start_interview(data: schemas.InterviewStart, db: Session = Depends(get_db))
         db.add(question)
         db.commit()
     
-    return {"interview_id": interview.id, "message": "Interview started", "total_questions": data.num_questions if not data.infinite_mode else -1}
+    # Generate access token for the session
+    token = auth_service.create_access_token({"interview_id": interview.id})
+
+    return {
+        "interview_id": interview.id, 
+        "access_token": token,
+        "status": "started"
+    }
 
 @router.get("/{interview_id}/next-question")
-def get_next_dynamic_question(interview_id: int, db: Session = Depends(get_db)):
+def get_next_dynamic_question(interview_id: int, db: Session = Depends(get_db), current_id: int = Depends(get_current_interview)):
+    if interview_id != current_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this session")
+
     interview = db.query(models.Interview).filter(models.Interview.id == interview_id).first()
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -111,43 +130,54 @@ def get_next_dynamic_question(interview_id: int, db: Session = Depends(get_db)):
         "total": -1 if interview.infinite_mode else 5
     }
 
-@router.get("/{interview_id}/question/{question_index}")
-def get_question_by_index(interview_id: int, question_index: int, db: Session = Depends(get_db)):
-    # Phase 1: Navigation Logic - Retrieve question by index
+@router.get("/{interview_id}/question/{index}")
+async def get_question(interview_id: int, index: int, db: Session = Depends(get_db), current_id: int = Depends(get_current_interview)):
+    if interview_id != current_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this session")
+    
+    interview = db.query(models.Interview).filter(models.Interview.id == interview_id).first()
+    if not interview:
+        raise HTTPException(status_code=404, detail="Interview not found")
+    
+    # Check if questions exist
     questions = db.query(models.Question).filter(models.Question.interview_id == interview_id).all()
-    if question_index < 0 or question_index >= len(questions):
+    if not questions or index >= len(questions):
+        # Generate dynamic if needed
+        if interview.adaptive_mode:
+            try:
+                # Use threadpool for blocking AI generation
+                new_q = await run_in_threadpool(ai_engine.generate_questions, interview.target_role, interview.target_skills.split(','), 1)
+                if new_q:
+                    q = models.Question(interview_id=interview_id, text=new_q[0], category="Adaptive", difficulty="Medium")
+                    db.add(q)
+                    db.commit()
+                    return {"id": q.id, "text": q.text, "finished": False}
+            except Exception: pass
         return {"finished": True}
     
-    question = questions[question_index]
-    
-    # Check if there's already a response for this question in this session
-    existing_response = db.query(models.Response).filter(
-        models.Response.interview_id == interview_id,
-        models.Response.question_id == question.id
-    ).first()
-    
-    return {
-        "question_id": question.id,
-        "text": question.text,
-        "previous_answer": existing_response.answer_text if existing_response else "",
-        "finished": False,
-        "total": len(questions)
-    }
+    q = questions[index]
+    return {"id": q.id, "text": q.text, "finished": False}
 
 @router.post("/{interview_id}/submit-response")
-def submit_response(interview_id: int, question_id: int, answer_text: str, db: Session = Depends(get_db)):
+async def submit_response(interview_id: int, data: schemas.ResponseSubmit, db: Session = Depends(get_db), current_id: int = Depends(get_current_interview)):
+    if interview_id != current_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this session")
+    
+    answer_text = data.answer_text
+    question_id = data.question_id
     # Phase 1: Validation
     if not answer_text or len(answer_text.strip()) < 3:
         raise HTTPException(status_code=400, detail="Answer is empty or too short.")
-    
-    # Phase 2: Evaluation Engine (Strictly based on input)
-    interview = db.query(models.Interview).filter(models.Interview.id == interview_id).first()
+
+    # Phase 2: AI Evaluation (Run in threadpool to avoid blocking)
     question = db.query(models.Question).filter(models.Question.id == question_id).first()
+    interview = db.query(models.Interview).filter(models.Interview.id == interview_id).first()
     
     if not question or not interview:
         raise HTTPException(status_code=404, detail="Entity not found")
         
-    evaluation = ai_engine.evaluate_answer(
+    evaluation = await run_in_threadpool(
+        ai_engine.evaluate_answer,
         question.text, 
         answer_text, 
         role=interview.target_role or "Expert",

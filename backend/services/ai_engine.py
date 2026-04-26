@@ -4,7 +4,10 @@ import re
 import json
 import time
 import datetime
-import streamlit as st
+try:
+    import streamlit as st  # Optional: only used for secrets when running in Streamlit
+except ImportError:
+    st = None
 from dotenv import load_dotenv
 
 load_dotenv()

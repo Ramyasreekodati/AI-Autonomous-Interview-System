@@ -26,8 +26,8 @@ class Interview(Base):
     infinite_mode = Column(Boolean, default=False)
     adaptive_mode = Column(Boolean, default=True)
     candidate = relationship("Candidate", back_populates="interviews")
-    responses = relationship("Response", back_populates="interview")
-    alerts = relationship("Alert", back_populates="interview")
+    responses = relationship("Response", back_populates="interview", cascade="all, delete-orphan")
+    alerts = relationship("Alert", back_populates="interview", cascade="all, delete-orphan")
 
 class Question(Base):
     __tablename__ = "questions"

@@ -42,3 +42,7 @@ class InterviewStart(BaseModel):
 class ResponseCreate(BaseModel):
     question_id: int
     answer_text: str
+
+class ResponseSubmit(BaseModel):
+    question_id: int
+    answer_text: str
