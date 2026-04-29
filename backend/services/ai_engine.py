@@ -1,5 +1,8 @@
 import os
 import logging
+import json
+import re
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 # Configure Logging
