@@ -242,31 +242,34 @@ async def submit_audio_response(interview_id: int, question_id: int, file: Uploa
     
     return {"transcription": transcription, "score": score}
 
-@router.post("/analyze-resume")
-async def analyze_resume(file: UploadFile = File(...), job_description: str = "Generic", db: Session = Depends(get_db)):
-    file_bytes = await file.read()
-    resume_content = ""
 
-    # Try PDF parsing first
-    if file.filename and file.filename.lower().endswith(".pdf"):
-        try:
-            import io
-            import PyPDF2
-            reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
-            resume_content = " ".join(page.extract_text() or "" for page in reader.pages)
-        except Exception:
-            pass
 
-    # Fallback: try to decode as plain text (DOCX or TXT)
-    if not resume_content.strip():
-        try:
-            resume_content = file_bytes.decode("utf-8", errors="ignore")
-        except Exception:
-            resume_content = "Could not extract text from the uploaded file."
-
-    analysis = ai_engine.analyze_resume_v2(resume_content[:4000], job_description)  # cap at 4000 chars
-    return analysis
-
+@router.get("/roulette/questions")
+async def get_roulette_questions(count: int = 5):
+    """
+    Rapid-fire behavioral questions for Interview Roulette.
+    """
+    try:
+        # Generate behavioral questions specifically
+        questions = ai_engine.generate_questions(
+            role="Behavioral Expert",
+            skills=["Communication", "Conflict Resolution", "Leadership", "Problem Solving"],
+            difficulty="High Pressure",
+            count=count,
+            experience="Senior",
+            interview_type="Rapid Fire Behavioral",
+            style="Challenging"
+        )
+        return {"questions": questions}
+    except Exception as e:
+        # Fallback to local questions if AI fails
+        return {"questions": [
+            "Tell me about a time you had to deal with a difficult coworker.",
+            "Describe a situation where you failed. What did you learn?",
+            "How do you prioritize multiple deadlines?",
+            "Tell me about a time you went above and beyond for a project.",
+            "How do you handle negative feedback?"
+        ][:count]}
 
 @router.get("/{interview_id}/results")
 def get_interview_results(interview_id: int, db: Session = Depends(get_db)):

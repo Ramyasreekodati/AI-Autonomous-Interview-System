@@ -10,6 +10,18 @@ class Candidate(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     interviews = relationship("Interview", back_populates="candidate")
+    stats = relationship("UserStats", back_populates="candidate", uselist=False)
+
+class UserStats(Base):
+    __tablename__ = "user_stats"
+    id = Column(Integer, primary_key=True, index=True)
+    candidate_id = Column(Integer, ForeignKey("candidates.id"))
+    streak = Column(Integer, default=0)
+    xp = Column(Integer, default=0)
+    badges = Column(JSON, default=[]) # List of earned badge names
+    last_practice_date = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    candidate = relationship("Candidate", back_populates="stats")
 
 class Interview(Base):
     __tablename__ = "interviews"

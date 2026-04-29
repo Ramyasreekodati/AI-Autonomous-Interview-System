@@ -88,8 +88,32 @@ class ReportingService:
         c.setFont("Helvetica-Bold", 10)
         c.drawCentredString(width-100, y+10, f"{risk} RISK")
 
+        # Skills Breakdown (Visual Bars)
+        y -= 40
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(50, y, "Competency Breakdown")
+        y -= 20
+        
+        breakdown = results_data.get('skills_breakdown', {})
+        for skill, score in breakdown.items():
+            c.setFont("Helvetica", 10)
+            c.setFillColorRGB(0.2, 0.2, 0.2)
+            c.drawString(50, y, f"{skill}")
+            
+            # Draw Bar
+            bar_width = (score / 10) * 150
+            c.setFillColorRGB(0.29, 0.56, 0.88)
+            c.rect(150, y-2, bar_width, 10, fill=1, stroke=0)
+            
+            c.setFillColorRGB(0.1, 0.1, 0.1)
+            c.drawString(150 + bar_width + 5, y, f"{score}/10")
+            y -= 15
+            if y < 100: # Simple pagination check
+                c.showPage()
+                y = height - 100
+
         # Alerts List
-        y -= 50
+        y -= 40
         c.setFillColorRGB(0.2, 0.2, 0.2)
         c.setFont("Helvetica-Bold", 14)
         c.drawString(50, y, "Logged Integrity Alerts")

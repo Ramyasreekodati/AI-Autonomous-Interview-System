@@ -1,14 +1,9 @@
-import google.generativeai as genai
-import os
-import re
-import json
-import time
-import datetime
-try:
-    import streamlit as st  # Optional: only used for secrets when running in Streamlit
-except ImportError:
-    st = None
+import logging
 from dotenv import load_dotenv
+
+# Configure Logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("AIEngine")
 
 load_dotenv()
 
@@ -17,58 +12,49 @@ _CONFIGURED_API_KEY = None
 
 def load_ai_model():
     """
-    Secure Model Initialization with Live Discovery (Cache disabled for recovery).
+    Secure Model Initialization with Live Discovery.
     """
-    # 🛡️ ARCHITECT FIX: Force reload .env every time if init failed previously
+    import google.generativeai as genai
     load_dotenv(override=True)
-    from pathlib import Path
-    env_path = Path(__file__).parent.parent.parent / '.env'
-    load_dotenv(dotenv_path=env_path)
     
-    # Discovery Logic
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    source = "Environment" if api_key else "None"
     
     if not api_key:
         try:
+            import streamlit as st
             api_key = st.secrets.get("GEMINI_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
-            if api_key: source = "Secrets"
-        except:
-            pass
+        except: pass
             
     if not api_key:
-        print("[AIEngine] Error: No API Key discovered in any source.")
+        logger.error("No API Key discovered in any source.")
         return None
         
-    # Sanitization
     clean_key = api_key.strip().strip('"').strip("'")
-    print(f"[AIEngine] Key found via {source} (Starts with: {clean_key[:5]}...)")
     
     try:
         global _CONFIGURED_API_KEY
         genai.configure(api_key=clean_key)
-        _CONFIGURED_API_KEY = clean_key  # Store for use in transcribe_bytes
+        _CONFIGURED_API_KEY = clean_key
         
-        # Prefer multimodal-capable models first (added newer versions found in models.txt)
+        # Priority models
         models_to_try = [
-            'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest', 
-            'gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-pro'
+            'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'
         ]
         
         for model_name in models_to_try:
-            full_name = f"models/{model_name}" if not model_name.startswith("models/") else model_name
             try:
-                # 🛡️ VERIFICATION: get_model will 404 here if the model is truly missing
-                genai.get_model(full_name)
-                model = genai.GenerativeModel(model_name)
-                # Test call to ensure generateContent is supported
-                print(f"[AIEngine] Model verified: {model_name}")
+                genai.get_model(f"models/{model_name}")
+                model = genai.GenerativeModel(
+                    model_name=model_name,
+                    generation_config={"temperature": 0.3}
+                )
+                logger.info(f"Model verified: {model_name}")
                 return model
             except Exception as e:
-                print(f"[AIEngine] Model {model_name} unavailable: {str(e)}")
+                logger.warning(f"Model {model_name} unavailable: {str(e)}")
                 continue
     except Exception as e:
-        print(f"[AIEngine] Configuration failed: {str(e)}")
+        logger.error(f"Configuration failed: {str(e)}")
         
     return None
 
@@ -124,10 +110,10 @@ class AIEngine:
                 "Transcribe every word spoken accurately. "
                 "If there is only silence or background noise with no speech, return exactly: [SILENCE]"
             )
-            print(f"[AIEngine] Transcribing {len(audio_data)} bytes...")
+            logger.info(f"Transcribing {len(audio_data)} bytes...")
             response = multimodal_model.generate_content([prompt, audio_part])
             text = response.text.strip()
-            print(f"[AIEngine] Raw Transcription: '{text}'")
+            logger.info(f"Raw Transcription: '{text}'")
             # Return empty string for silence, actual text otherwise
             if "[SILENCE]" in text or not text:
                 return ""
@@ -168,7 +154,7 @@ class AIEngine:
                 if json_match:
                     return json.loads(json_match.group())
             except Exception as e:
-                print(f"[AIEngine] Sentiment analysis failed: {e}")
+                logger.error(f"Sentiment analysis failed: {e}")
         except: pass
         return {"confidence": 50, "clarity": 50, "tone": "Neutral"}
 
@@ -256,7 +242,7 @@ class AIEngine:
             return text
                 
         except Exception as e:
-            print(f"[AIEngine] Dynamic Generation Failure: {str(e)}")
+            logger.error(f"Dynamic Generation Failure: {str(e)}")
             return self._get_local_questions(role, 1)[0]
 
     def generate_questions(self, role, skills, difficulty, count, experience, interview_type, style, previous_questions=[]):
@@ -308,7 +294,7 @@ class AIEngine:
                     return questions + padding
                 
         except Exception as e:
-            print(f"[AIEngine] Generation Failure: {str(e)}")
+            logger.error(f"Generation Failure: {str(e)}")
             # Silent fallback to local questions instead of showing red error box
 
         return self._get_local_questions(role, count)
@@ -346,7 +332,7 @@ class AIEngine:
             if json_match:
                 return json.loads(json_match.group())
         except Exception as e:
-            print(f"[AIEngine] Resume V2 Failure: {str(e)}")
+            logger.error(f"Resume V2 Failure: {str(e)}")
             
         return {"readability": 0, "credibility": 0, "ats_fit": 0, "error": "Analysis failed"}
 
@@ -440,7 +426,7 @@ class AIEngine:
                 result["sentiment"] = sentiment
                 return result
         except Exception as e:
-            print(f"[AIEngine] Evaluation Failure: {str(e)}")
+            logger.error(f"Evaluation Failure: {str(e)}")
             
         return {"score": 5, "strengths": ["Attempted"], "weaknesses": ["AI evaluation failed"], "sentiment": sentiment}
 

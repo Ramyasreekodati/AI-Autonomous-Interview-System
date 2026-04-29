@@ -73,6 +73,20 @@ class ScoringService:
         else:
             justification += "Zero behavioral violations detected during the session."
 
+        # Skills Breakdown logic
+        skills_breakdown = {}
+        for r in responses:
+            q = db.query(models.Question).filter(models.Question.id == r.question_id).first()
+            if q:
+                cat = q.category or "General"
+                if cat not in skills_breakdown:
+                    skills_breakdown[cat] = {"score": 0, "count": 0}
+                skills_breakdown[cat]["score"] += r.relevance_score
+                skills_breakdown[cat]["count"] += 1
+        
+        # Calculate averages for breakdown
+        final_breakdown = {cat: round(data["score"] / data["count"], 1) for cat, data in skills_breakdown.items()}
+
         return {
             "interview_score": round(avg_answer_score, 1),
             "behavior_score": round(behavior_score, 1),
@@ -80,7 +94,8 @@ class ScoringService:
             "alerts": list(set(alert_types)),
             "final_decision": final_decision,
             "justification": justification,
-            "final_aggregate_score": final_score
+            "final_aggregate_score": final_score,
+            "skills_breakdown": final_breakdown
         }
 
 scoring_service = ScoringService()

@@ -7,58 +7,76 @@
 
 ## ✨ Key Features
 
-- **🧠 Intelligent Technical Audit**: Adaptive question generation focused on specific core competencies (Python, AWS, Distributed Systems, etc.).
-- **🎙️ Zero-Fail STT Engine**: Robust Speech-to-Text pipeline with a multimodal cloud bridge, ensuring reliable transcription even without local system dependencies.
-- **🛡️ AI Proctoring & Integrity**: Real-time behavioral surveillance, including gaze tracking, emotion detection, and object detection (phone/book).
-- **📊 Automated Certification**: Comprehensive evaluation reports featuring technical scoring, behavioral risk assessment, and hiring justifications.
-- **💎 Enterprise UI/UX**: Professional, high-visibility "Light-Theme" dashboard designed for recruiters and technical managers.
+- **🧠 Multi-Agent Interview Flow**: Powered by LangGraph, featuring Evaluator, Interviewer, and Orchestrator agents.
+- **🎙️ Real-time Analysis**: Live speech-to-text with behavioral metrics (pace, confidence, tone).
+- **🛡️ AI Proctoring**: Real-time surveillance tracking gaze, emotion, and suspicious objects.
+- **📄 Resume AI Scanner**: ATS optimization and job match analysis.
+- **📊 Admin Dashboard**: Recruiter portal for viewing interview recordings and detailed PDF reports.
+- **💎 Glassmorphism UI**: High-end, modern React frontend with smooth animations.
 
 ## 🛠️ Tech Stack
 
-- **Framework**: Streamlit (Production Grade)
-- **AI Core**: Google Gemini 1.5 Flash / Pro (Multimodal)
-- **Transcription**: SpeechRecognition + Pydub + Gemini Multimodal Bridge
-- **Surveillance**: MediaPipe + OpenCV (Computer Vision)
-- **State Management**: Robust Session Persistence
-- **Design**: Professional CSS with custom glassmorphism components
+### Frontend
+- **Framework**: React 19 + Vite
+- **Styling**: Tailwind CSS 4 + Framer Motion
+- **Icons**: Lucide React
+
+### Backend
+- **Framework**: FastAPI (Python)
+- **AI Core**: Google Gemini 1.5 (via LangChain & LangGraph)
+- **Database**: SQLite with SQLAlchemy
+- **Surveillance**: MediaPipe + OpenCV
+
+---
 
 ## 🚦 Quick Start
 
 ### 1. Prerequisites
 - Python 3.9+
+- Node.js & npm
 - A Google Gemini API Key
 
-### 2. Installation
-```bash
-# Clone the repository
-git clone https://github.com/Ramyasreekodati/AI-Autonomous-Interview-System.git
-cd AI-Autonomous-Interview-System
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 3. Configuration
+### 2. Configuration
 Create a `.env` file in the root directory:
 ```env
 GEMINI_API_KEY=your_api_key_here
 ```
 
-### 4. Run the Audit System
+### 3. Installation & Run
+
+#### Backend
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+#### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+#### Admin Dashboard (Optional)
 ```bash
 streamlit run streamlit_app.py
 ```
 
 ## 📂 Project Structure
 ```text
-├── streamlit_app.py     # Main Entry Point (Auditor Dashboard)
-├── backend/
-│   ├── services/
-│   │   ├── ai_engine.py    # Master AI Logic (STT, Evaluation, Generation)
-│   │   ├── surveillance.py # Computer Vision & Proctoring
-│   │   └── reporting.py    # Analytics & PDF Generation
-├── .env                 # Environment Configuration
-└── requirements.txt     # System Dependencies
+├── backend/            # FastAPI Server
+│   ├── agents/         # LangGraph Multi-Agent logic
+│   ├── services/       # Core services (AI, STT, Proctoring)
+│   ├── routers/        # API Endpoints
+│   └── database.py     # SQLAlchemy Configuration
+├── frontend/           # React Application
+│   ├── src/components/ # Reusable UI components
+│   └── src/pages/      # Main application views
+├── admin/              # (Planned) Admin tools
+├── streamlit_app.py    # Admin & Recruiter Dashboard
+├── docs/               # Project documentation & reports
+└── .env                # Environment Configuration
 ```
 
 ---
