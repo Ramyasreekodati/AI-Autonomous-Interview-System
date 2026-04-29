@@ -28,11 +28,11 @@ COPY .env .
 # Copy built frontend from Stage 1
 COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
-EXPOSE 8000
+EXPOSE 7860
 
 # Healthcheck to ensure the unified app is up
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl --fail http://localhost:8000/ || exit 1
+    CMD curl --fail http://localhost:7860/ || exit 1
 
 # Start the unified FastAPI server
-ENTRYPOINT ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "7860"]
