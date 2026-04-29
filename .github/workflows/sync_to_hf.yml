@@ -13,7 +13,7 @@ jobs:
           fetch-depth: 0
           lfs: true
       - name: Push to hub
-        uses: huggingface/hub-sync@v1.0
+        uses: huggingface/hub-sync@main
         with:
           github_repo_id: Ramyasreekodati/AI-Autonomous-Interview-System
           huggingface_repo_id: kodatiramyasree/recruit-ai
