@@ -15,4 +15,6 @@ jobs:
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push --force https://kodatiramyasree:$HF_TOKEN@huggingface.co/spaces/kodatiramyasree/recruit-ai main
+        run: |
+          git remote add hf https://token:$HF_TOKEN@huggingface.co/spaces/kodatiramyasree/recruit-ai
+          git push --force hf main
