@@ -278,9 +278,9 @@ async def get_report(interview_id: int, db: Session = Depends(get_db)):
     report_path = reporting_service.generate_report(name, results)
     return FileResponse(report_path, filename=f"RecruitAI_Report_{interview_id}.pdf")
 
-@app.get("/")
-async def root():
-    return {"message": "Welcome to AI Autonomous Interview System API"}
+# @app.get("/")
+# async def root():
+#     return {"message": "Welcome to AI Autonomous Interview System API"}
 
 from fastapi.staticfiles import StaticFiles
 
